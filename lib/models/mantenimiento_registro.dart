@@ -5,7 +5,7 @@ class MantenimientoRegistro {
   final String? tituloReporte; // Es fijo, pero lo incluimos para el modelo
   final String planta;
   final String fecha;
-  final String mecanico;
+  final String realizadoPor;
   final String? ayudante; // Opcional
   final String orden;
 
@@ -56,7 +56,7 @@ class MantenimientoRegistro {
     this.tituloReporte,
     required this.planta,
     required this.fecha,
-    required this.mecanico,
+    required this.realizadoPor,
     this.ayudante,
     required this.orden,
     required this.area,
@@ -91,7 +91,7 @@ class MantenimientoRegistro {
       'tituloReporte': tituloReporte,
       'planta': planta,
       'fecha': fecha,
-      'mecanico': mecanico,
+      'realizadoPor': realizadoPor,
       'ayudante': ayudante,
       'orden': orden,
       'area': area,

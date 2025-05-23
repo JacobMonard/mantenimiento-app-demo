@@ -19,12 +19,13 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _descripcionUbicacionController = TextEditingController();
+  final TextEditingController _tiempoEstimadoController = TextEditingController(); // Nuevo controlador para tiempo estimado
 
   // Variables de estado para los campos del formulario
   // 2. Datos Generales
   String _plantaSeleccionada = '';
   String _fecha = '';
-  String _mecanicoSeleccionado = '';
+  String _realizadoPorSeleccionado = '';
   String _ayudanteSeleccionado = 'Ninguno'; // Default
   String _orden = '';
 
@@ -63,15 +64,17 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   };
   String _otroAccionTexto = '';
   String _materialesRepuestos = '';
-  String _horaInicio = '';
-  String _horaFin = '';
-  String _tiempoEstimado = '';
+  String _horaInicio = ''; // Variable para almacenar la hora de inicio
+  String _horaFin = '';     // Variable para almacenar la hora de fin
+  String _tiempoEstimado = ''; // Variable para almacenar el tiempo estimado calculado
   final Map<String, bool> _permisosRequeridosCheckboxes = {
-    'LoToTo': false,
+    'LOTOTO': false,
     'Espacio confinado': false,
     'Trabajo en caliente': false,
     'Alturas': false,
-    'Ninguno': false,
+    'Sustancias Químicas': false, // Estas se mantienen en su orden actual
+    'Ingreso a patios': false,     // Estas se mantienen en su orden actual
+    'Ninguno': false,            // <--- MOVIDO AL FINAL
   };
   String _descripcionActividades = '';
 
@@ -95,7 +98,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     'Energía & Planta de Fuerza', 'Pulpapel', 'Molino 1', 'Molino 3',
     'Molino 4', 'Molino 6', 'FEC', 'Recuperación',
   ];
-  final List<String> _mecanicos = [
+  final List<String> _realizadoPor = [
     'Robinson Montoya', 'Carlos Salcedo', 'Samir Ramirez',
     'William Garzon', 'Daniel Franco', 'Camilo Ayala',
   ];
@@ -128,7 +131,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     // Inicializar los valores seleccionados para DropdownButtonFormField
     // Asegurar que la primera opción sea seleccionada si la lista no está vacía
     _plantaSeleccionada = _plantas.isNotEmpty ? _plantas.first : '';
-    _mecanicoSeleccionado = _mecanicos.isNotEmpty ? _mecanicos.first : '';
+    _realizadoPorSeleccionado = _realizadoPor.isNotEmpty ? _realizadoPor.first : '';
     _ayudanteSeleccionado = _ayudantes.isNotEmpty ? _ayudantes.first : 'Ninguno';
     _areaSeleccionada = _areas.isNotEmpty ? _areas.first : '';
     _condicionEncontrada = _condicionesEncontradas.isNotEmpty ? _condicionesEncontradas.first : '';
@@ -170,7 +173,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
       });
     } catch (e) {
       // Manejo de errores si el archivo no se encuentra o no se puede leer
-      print('Error al cargar la descripción de ubicaciones: $e');
+      print('Error al cargar la descripción de ubicaciones: $e'); // Usar print para depuración
       if (mounted) { // Verificar si el widget está montado antes de mostrar SnackBar
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al cargar datos de Ubicación Técnica: $e')),
@@ -194,6 +197,56 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
       });
     }
   }
+
+  void _calcularTiempoEstimado() {
+    if (_horaInicio.isNotEmpty && _horaFin.isNotEmpty) {
+      try {
+        // Asume formato HH:MM
+        final List<String> inicioParts = _horaInicio.split(':');
+        final List<String> finParts = _horaFin.split(':');
+
+        final int inicioHora = int.parse(inicioParts[0]);
+        final int inicioMinuto = int.parse(inicioParts[1]);
+        final int finHora = int.parse(finParts[0]);
+        final int finMinuto = int.parse(finParts[1]);
+
+        // Crear objetos DateTime para calcular la diferencia
+        // Usamos una fecha arbitraria (hoy) para tener un punto de referencia
+        final DateTime inicio = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day, inicioHora, inicioMinuto);
+        final DateTime fin = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day, finHora, finMinuto);
+
+        Duration duracion;
+        if (fin.isBefore(inicio)) {
+          // Si la hora de fin es anterior a la de inicio (ej. de la noche a la mañana siguiente)
+          duracion = fin.add(const Duration(days: 1)).difference(inicio);
+        } else {
+          duracion = fin.difference(inicio);
+        }
+
+        final int totalMinutos = duracion.inMinutes;
+        final int horas = totalMinutos ~/ 60; // División entera para horas
+        final int minutos = totalMinutos % 60; // Resto para minutos
+
+        setState(() {
+          _tiempoEstimado = '${horas.toString().padLeft(2, '0')}:${minutos.toString().padLeft(2, '0')}';
+          _tiempoEstimadoController.text = _tiempoEstimado; // Actualizar el controlador
+        });
+
+      } catch (e) {
+        setState(() {
+          _tiempoEstimado = ''; // Limpiar si hay error de formato
+          _tiempoEstimadoController.text = 'Formato inválido';
+        });
+        print('Error al parsear horas: $e'); // Usar print para depuración
+      }
+    } else {
+      setState(() {
+        _tiempoEstimado = '';
+        _tiempoEstimadoController.text = '';
+      });
+    }
+  }
+
 
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
@@ -225,7 +278,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
         tituloReporte: 'Reporte de Mantenimiento E-PWP',
         planta: _plantaSeleccionada,
         fecha: _fecha,
-        mecanico: _mecanicoSeleccionado,
+        realizadoPor: _realizadoPorSeleccionado,
         ayudante: _ayudanteSeleccionado,
         orden: _orden,
         area: _areaSeleccionada,
@@ -255,11 +308,13 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
       );
 
       // Imprimir todos los datos recogidos (para depuración)
-      print('Datos del Reporte: ${registro.toJson()}');
+      print('Datos del Reporte: ${registro.toJson()}'); // Usar print para depuración
 
       // --- Simulación de envío al servidor (si tienes uno) ---
       // Esta parte es solo para demostración. En producción, necesitarías un backend.
       /*
+      // Asegúrate de importar 'package:http/http.dart' as http; y 'dart:convert';
+      // y de tener un servidor Flask local ejecutándose en 127.0.0.1:5000/guardar_reporte
       http.post(
         Uri.parse('http://127.0.0.1:5000/guardar_reporte'),
         headers: {
@@ -270,20 +325,26 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
         if (response.statusCode == 200) {
           final responseData = json.decode(response.body);
           print(responseData);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(responseData['mensaje'] ?? 'Reporte guardado exitosamente.')),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(responseData['mensaje'] ?? 'Reporte guardado exitosamente.')),
+            );
+          }
         } else {
           print('Error al guardar reporte: ${response.statusCode}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error al guardar el reporte. Código: ${response.statusCode}')),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error al guardar el reporte. Código: ${response.statusCode}')),
+            );
+          }
         }
       }).catchError((error) {
         print('Error de conexión: $error');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al enviar el reporte. Verifique la conexión al servidor.')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al enviar el reporte. Verifique la conexión al servidor.')),
+          );
+        }
       });
       */
 
@@ -383,11 +444,11 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                       : null,
                 ),
 
-                // Campo Mecánico
+                // Campo realizadoPor
                 DropdownButtonFormField<String>(
-                  value: _mecanicoSeleccionado.isEmpty ? null : _mecanicoSeleccionado,
-                  decoration: const InputDecoration(labelText: 'Mecánico'),
-                  items: _mecanicos.map<DropdownMenuItem<String>>((String value) {
+                  value: _realizadoPorSeleccionado.isEmpty ? null : _realizadoPorSeleccionado,
+                  decoration: const InputDecoration(labelText: 'Realizado Por'),
+                  items: _realizadoPor.map<DropdownMenuItem<String>>((String value) {
                     return DropdownMenuItem<String>(
                       value: value,
                       child: Text(value),
@@ -395,11 +456,11 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                   }).toList(),
                   onChanged: (String? newValue) {
                     setState(() {
-                      _mecanicoSeleccionado = newValue!;
+                      _realizadoPorSeleccionado = newValue!;
                     });
                   },
                   validator: (value) => value == null || value.isEmpty
-                      ? 'Seleccione un mecánico'
+                      ? 'Seleccione un respopnsable'
                       : null,
                 ),
 
@@ -456,26 +517,90 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                 ),
 
                 // Campo Ubicación Técnica
-                DropdownButtonFormField<String>(
-                  value: _ubicacionTecnicaSeleccionada.isEmpty ? null : _ubicacionTecnicaSeleccionada,
-                  decoration: const InputDecoration(labelText: 'Ubicación Técnica'),
-                  // Asegurarse de que _ubicacionesTecnicasOpciones esté cargada antes de construir los items
-                  items: _ubicacionesTecnicasOpciones.map<DropdownMenuItem<String>>((String value) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value),
-                    );
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      _ubicacionTecnicaSeleccionada = newValue!;
-                      _descripcionUbicacion = _ubicacionDescripcionMap[newValue] ?? '';
-                      _descripcionUbicacionController.text = _descripcionUbicacion; // Actualizar el controlador
+                Autocomplete<String>(
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text.isEmpty) {
+                      return const Iterable<String>.empty();
+                    }
+                    // Filtra las opciones basadas en el texto digitado
+                    return _ubicacionesTecnicasOpciones.where((String option) {
+                      return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
                     });
                   },
-                  validator: (value) => value == null || value.isEmpty
-                      ? 'Seleccione una ubicación'
-                      : null,
+                  onSelected: (String selection) {
+                    setState(() {
+                      _ubicacionTecnicaSeleccionada = selection;
+                      _descripcionUbicacion = _ubicacionDescripcionMap[selection] ?? '';
+                      _descripcionUbicacionController.text = _descripcionUbicacion;
+                    });
+                  },
+                  fieldViewBuilder: (BuildContext context,
+                      TextEditingController fieldTextEditingController,
+                      FocusNode fieldFocusNode,
+                      VoidCallback onFieldSubmitted) {
+                    // Este es el TextFormField que el usuario ve y edita
+                    return TextFormField(
+                      controller: fieldTextEditingController,
+                      focusNode: fieldFocusNode,
+                      decoration: const InputDecoration(
+                        labelText: 'Ubicación Técnica',
+                        hintText: 'Digite para buscar...',
+                      ),
+                      validator: (value) {
+                        // Valida si el valor seleccionado está en la lista de opciones válidas
+                        if (value == null || value.isEmpty) {
+                          return 'Seleccione una ubicación';
+                        }
+                        // Solo valida si la opción existe en el mapa de descripciones
+                        if (!_ubicacionDescripcionMap.containsKey(value)) {
+                          return 'Ubicación no válida';
+                        }
+                        return null;
+                      },
+                      onChanged: (value) {
+                        // Limpia la descripción si el usuario cambia el texto
+                        // antes de seleccionar una opción válida
+                        if (!_ubicacionDescripcionMap.containsKey(value)) {
+                          setState(() {
+                            _descripcionUbicacion = '';
+                            _descripcionUbicacionController.text = '';
+                          });
+                        }
+                      },
+                      onSaved: (newValue) {
+                        _ubicacionTecnicaSeleccionada = newValue!;
+                      },
+                    );
+                  },
+                  optionsViewBuilder: (BuildContext context,
+                      AutocompleteOnSelected<String> onSelected,
+                      Iterable<String> options) {
+                    // Este es el cuadro que muestra las opciones filtradas
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4.0,
+                        child: SizedBox(
+                          height: 200.0, // Altura máxima para la lista de opciones
+                          child: ListView.builder(
+                            padding: EdgeInsets.zero,
+                            itemCount: options.length,
+                            itemBuilder: (BuildContext context, int index) {
+                              final String option = options.elementAt(index);
+                              return GestureDetector(
+                                onTap: () {
+                                  onSelected(option);
+                                },
+                                child: ListTile(
+                                  title: Text(option),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 
                 // Campo Descripción (se actualiza automáticamente)
@@ -646,7 +771,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                 const SizedBox(height: 20),
 
                 // --- Horas de Intervención ---
-                const Text('Horas de Intervención',
+                const Text('Duración de la Intervención', // Título actualizado
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const Divider(),
                 Row(
@@ -658,6 +783,10 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                         validator: (value) => value == null || value.isEmpty
                             ? 'Ingrese hora de inicio'
                             : null,
+                        onChanged: (value) { // Para calcular automáticamente
+                          _horaInicio = value;
+                          _calcularTiempoEstimado();
+                        },
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -668,14 +797,20 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                         validator: (value) => value == null || value.isEmpty
                             ? 'Ingrese hora de fin'
                             : null,
+                        onChanged: (value) { // Para calcular automáticamente
+                          _horaFin = value;
+                          _calcularTiempoEstimado();
+                        },
                       ),
                     ),
                   ],
                 ),
                 TextFormField(
+                  controller: _tiempoEstimadoController, // Controlador para mostrar el valor calculado
+                  readOnly: true, // Campo de solo lectura
                   decoration: const InputDecoration(labelText: 'Tiempo estimado de intervención (HH:MM)'),
                   onSaved: (newValue) => _tiempoEstimado = newValue!,
-                  // Validación opcional si debe ser un formato específico HH:MM
+                  // Ya no se necesita validación manual aquí
                 ),
                 const SizedBox(height: 20),
                 
@@ -722,7 +857,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                 const SizedBox(height: 20),
 
                 // --- Evidencia ---
-                const Text('Evidencia',
+                const Text('Adjuntos',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const Divider(),
                 
