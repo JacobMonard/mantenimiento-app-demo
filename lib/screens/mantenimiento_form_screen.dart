@@ -3,13 +3,22 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // Para formateo de fechas
 import 'package:flutter/services.dart' show rootBundle; // Importar para leer assets
-// import 'package:http/http.dart' as http; // Se usará si hay backend real
-// import 'dart:convert'; // Se usará si hay backend real
+import 'package:image_picker/image_picker.dart'; // Importación para seleccionar imágenes/videos
+import 'dart:typed_data'; // <-- CAMBIO: Importar para Uint8List
+import 'dart:io'; // <-- CAMBIO: Importar para File. Útil para mostrar imágenes en móvil/desktop.
+import 'package:flutter/foundation.dart' show kIsWeb; // <-- CAMBIO: Para saber si estamos en web
+
+// ¡Nuevas importaciones para PDF y compartir!
+import 'package:printing/printing.dart'; // <-- NUEVO: Para previsualizar/imprimir PDF
+import 'package:pdf/pdf.dart'; // <-- NUEVO: Para PdfPageFormat
+import '../utils/pdf_generator.dart'; // <-- NUEVO: Importa tu generador de PDF
+import 'package:path_provider/path_provider.dart'; // <-- NUEVO: Para guardar archivos en el dispositivo
+import 'package:share_plus/share_plus.dart'; // <-- NUEVO: Para compartir archivos
 
 import '../models/mantenimiento_registro.dart'; // Importa tu modelo de datos
 
 class MantenimientoFormScreen extends StatefulWidget {
-  const MantenimientoFormScreen({super.key}); // Usar super.key para lint
+  const MantenimientoFormScreen({super.key});
 
   @override
   State<MantenimientoFormScreen> createState() => _MantenimientoFormScreenState();
@@ -19,14 +28,18 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _descripcionUbicacionController = TextEditingController();
-  final TextEditingController _tiempoEstimadoController = TextEditingController(); // Nuevo controlador para tiempo estimado
+  final TextEditingController _tiempoEstimadoController = TextEditingController();
+
+  // Instancia del modelo para guardar los datos
+  // <-- CAMBIO: Inicializa una instancia de tu modelo para ir guardando los datos.
+  late MantenimientoRegistro _mantenimientoRegistro;
 
   // Variables de estado para los campos del formulario
   // 2. Datos Generales
   String _plantaSeleccionada = '';
   String _fecha = '';
   String _realizadoPorSeleccionado = '';
-  String _ayudanteSeleccionado = 'Ninguno'; // Default
+  String _ayudanteSeleccionado = 'Ninguno';
   String _orden = '';
 
   // 3. Información del Equipo
@@ -47,7 +60,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     'Aceptable': false,
     'Regular': false,
   };
-  String _existeAveria = 'No'; // Nuevo campo: ¿Existe alguna avería?
+  String _existeAveria = 'No';
 
   // 5. Descripción del Problema o Motivo de la Intervención
   String _descripcionProblema = '';
@@ -64,23 +77,31 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   };
   String _otroAccionTexto = '';
   String _materialesRepuestos = '';
-  String _horaInicio = ''; // Variable para almacenar la hora de inicio
-  String _horaFin = '';     // Variable para almacenar la hora de fin
-  String _tiempoEstimado = ''; // Variable para almacenar el tiempo estimado calculado
+  String _horaInicio = '';
+  String _horaFin = '';
+  String _tiempoEstimado = '';
   final Map<String, bool> _permisosRequeridosCheckboxes = {
     'LOTOTO': false,
     'Espacio confinado': false,
     'Trabajo en caliente': false,
     'Alturas': false,
-    'Sustancias Químicas': false, // Estas se mantienen en su orden actual
-    'Ingreso a patios': false,     // Estas se mantienen en su orden actual
-    'Ninguno': false,            // <--- MOVIDO AL FINAL
+    'Sustancias Químicas': false,
+    'Ingreso a patios': false,
+    'Izar Cargas': false,
+    'Ingreso Cuartos Eléctricos': false,
+    'Subestaciones': false,
+    'Ninguno': false,
   };
   String _descripcionActividades = '';
 
-  // 7. Evidencia (simuladas por ahora)
-  List<String> _fotos = [];
-  String? _video;
+  // 7. Evidencia (rutas de los archivos seleccionados)
+  // <-- CAMBIO: Almacenaremos los bytes, no solo las rutas String
+  List<Uint8List> _fotosBytes = [];
+  Uint8List? _videoBytes; // <-- CAMBIO: Almacenaremos los bytes del video
+
+  // <-- NUEVO: Variables para mostrar las rutas/URLs en la UI
+  List<String> _fotosDisplayPaths = [];
+  String? _videoDisplayPath;
 
   // 8. Evaluación Técnica
   String _condicionFinalEquipo = '';
@@ -92,7 +113,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   String _accionesSugeridasCortoPlazo = '';
   String _sugerenciasMejoraRedisenio = '';
 
-
   // Listas de opciones estáticas (para Spinners/Dropdowns)
   final List<String> _plantas = [
     'Energía & Planta de Fuerza', 'Pulpapel', 'Molino 1', 'Molino 3',
@@ -101,17 +121,19 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   final List<String> _realizadoPor = [
     'Robinson Montoya', 'Carlos Salcedo', 'Samir Ramirez',
     'William Garzon', 'Daniel Franco', 'Camilo Ayala',
+    'Francisco Dagua', 'Alvaro Molina', 'Erick V. Leon', 'Juan C. Reina',
   ];
   final List<String> _ayudantes = [
     'Ninguno', 'Robinson Montoya', 'Carlos Salcedo', 'Samir Ramirez',
     'William Garzon', 'Daniel Franco', 'Camilo Ayala',
+    'Francisco Dagua', 'Alvaro Molina', 'Erick V. Leon', 'Juan C. Reina',
   ];
   final List<String> _areas = [
     'Caldera 5', 'Caldera 4', 'Caldera 3', 'TGAS', 'TG3',
     'Sistema de carbón', 'Aire comprimido', 'Transporte de ceniza', 'Agua',
   ];
-  List<String> _ubicacionesTecnicasOpciones = []; // Se llenará asíncronamente
-  Map<String, String> _ubicacionDescripcionMap = {}; // Se llenará asíncronamente
+  List<String> _ubicacionesTecnicasOpciones = [];
+  Map<String, String> _ubicacionDescripcionMap = {};
 
   final List<String> _condicionesEncontradas = [
     'Operativo', 'Detenido por falla', 'Intermitente', 'Operando con falla',
@@ -120,22 +142,67 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     'Operativo', 'En pruebas', 'Fuera de servicio',
   ];
 
-
   @override
   void initState() {
     super.initState();
     _fecha = DateFormat('yyyy-MM-dd').format(DateTime.now());
     _dateController.text = _fecha;
-    _loadUbicacionDescripcion(); // Cargar el mapa desde el asset
+    _loadUbicacionDescripcion();
 
-    // Inicializar los valores seleccionados para DropdownButtonFormField
-    // Asegurar que la primera opción sea seleccionada si la lista no está vacía
-    _plantaSeleccionada = _plantas.isNotEmpty ? _plantas.first : '';
-    _realizadoPorSeleccionado = _realizadoPor.isNotEmpty ? _realizadoPor.first : '';
-    _ayudanteSeleccionado = _ayudantes.isNotEmpty ? _ayudantes.first : 'Ninguno';
-    _areaSeleccionada = _areas.isNotEmpty ? _areas.first : '';
-    _condicionEncontrada = _condicionesEncontradas.isNotEmpty ? _condicionesEncontradas.first : '';
-    _condicionFinalEquipo = _condicionesFinalesEquipo.isNotEmpty ? _condicionesFinalesEquipo.first : '';
+    // Inicializar _mantenimientoRegistro con valores por defecto al inicio
+    _mantenimientoRegistro = MantenimientoRegistro(
+      tituloReporte: 'Reporte de Mantenimiento E-PWP',
+      planta: _plantas.isNotEmpty ? _plantas.first : '',
+      fecha: _fecha,
+      realizadoPor: _realizadoPor.isNotEmpty ? _realizadoPor.first : '',
+      ayudante: _ayudantes.isNotEmpty ? _ayudantes.first : 'Ninguno',
+      orden: '',
+      area: _areas.isNotEmpty ? _areas.first : '',
+      ubicacionTecnica: '', // Se llena después de cargar el txt
+      descripcionUbicacion: '', // Se llena con el controlador
+      tipoMantenimiento: [],
+      condicionEncontrada: _condicionesEncontradas.isNotEmpty ? _condicionesEncontradas.first : '',
+      estadoEquipo: [],
+      existeAveria: 'No',
+      descripcionProblema: '',
+      accionesRealizadas: [],
+      materialesRepuestos: '',
+      horaInicio: '',
+      horaFin: '',
+      tiempoEstimado: '',
+      permisosRequeridos: [],
+      descripcionActividades: '',
+      fotosBytes: [], // Inicializa la lista de bytes vacía
+      videoBytes: null, // Inicializa el video como nulo
+      condicionFinalEquipo: _condicionesFinalesEquipo.isNotEmpty ? _condicionesFinalesEquipo.first : '',
+      requiereSeguimiento: 'No',
+      detalleSeguimiento: '',
+      riesgosObservados: '',
+      accionesSugeridasCortoPlazo: '',
+      sugerenciasMejoraRedisenio: '',
+    );
+
+    // Actualizar los valores iniciales de los dropdowns si _mantenimientoRegistro ya tiene datos
+    _plantaSeleccionada = _mantenimientoRegistro.planta;
+    _realizadoPorSeleccionado = _mantenimientoRegistro.realizadoPor;
+    _ayudanteSeleccionado = _mantenimientoRegistro.ayudante ?? 'Ninguno';
+    _areaSeleccionada = _mantenimientoRegistro.area;
+    _condicionEncontrada = _mantenimientoRegistro.condicionEncontrada;
+    _condicionFinalEquipo = _mantenimientoRegistro.condicionFinalEquipo;
+
+    // Inicializar _fotosBytes y _videoBytes si el formulario está siendo editado
+    // (Aunque en este caso, el constructor de MantenimientoFormScreen no recibe un MantenimientoRegistro,
+    // esta lógica sería útil si lo hiciera en el futuro)
+    // _fotosBytes = _mantenimientoRegistro.fotosBytes;
+    // _videoBytes = _mantenimientoRegistro.videoBytes;
+
+    // Reconstruir display paths si ya hay bytes (para recargar un formulario existente)
+    // if (_fotosBytes.isNotEmpty) {
+    //   _fotosDisplayPaths = _fotosBytes.map((bytes) => 'Bytes de Imagen').toList(); // No es una ruta real
+    // }
+    // if (_videoBytes != null) {
+    //   _videoDisplayPath = 'Bytes de Video'; // No es una ruta real
+    // }
   }
 
   // Función para cargar el mapa de ubicaciones y descripciones desde assets/descripcion.txt
@@ -144,27 +211,23 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
       final String fileContent = await rootBundle.loadString('assets/descripcion.txt');
       final List<String> lines = fileContent.split('\n');
       Map<String, String> tempMap = {};
-      
-      // Saltar la primera línea que es el encabezado "Ubicación Tecnica\tDescripción"
+
       for (int i = 1; i < lines.length; i++) {
         final String line = lines[i].trim();
         if (line.isNotEmpty) {
           final List<String> parts = line.split('\t');
-          if (parts.length >= 2) { // Asegurarse de que haya al menos 2 partes
-            tempMap[parts[0].trim()] = parts.sublist(1).join('\t').trim(); // Une el resto por si la descripción tiene tabulaciones
+          if (parts.length >= 2) {
+            tempMap[parts[0].trim()] = parts.sublist(1).join('\t').trim();
           } else {
-            // Manejar líneas que no tienen el formato esperado (ej. solo ubicación sin descripción)
-            tempMap[parts[0].trim()] = ''; // Asignar descripción vacía
+            tempMap[parts[0].trim()] = '';
           }
         }
       }
-      
+
       setState(() {
         _ubicacionDescripcionMap = tempMap;
         _ubicacionesTecnicasOpciones = _ubicacionDescripcionMap.keys.toList();
 
-        // Seleccionar la primera ubicación y actualizar la descripción al cargar
-        // Solo si la lista de opciones no está vacía después de la carga
         if (_ubicacionesTecnicasOpciones.isNotEmpty) {
           _ubicacionTecnicaSeleccionada = _ubicacionesTecnicasOpciones.first;
           _descripcionUbicacion = _ubicacionDescripcionMap[_ubicacionTecnicaSeleccionada] ?? '';
@@ -172,9 +235,8 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
         }
       });
     } catch (e) {
-      // Manejo de errores si el archivo no se encuentra o no se puede leer
-      print('Error al cargar la descripción de ubicaciones: $e'); // Usar print para depuración
-      if (mounted) { // Verificar si el widget está montado antes de mostrar SnackBar
+      print('Error al cargar la descripción de ubicaciones: $e');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al cargar datos de Ubicación Técnica: $e')),
         );
@@ -182,7 +244,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     }
   }
 
-  // --- Funciones de Asistencia ---
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -201,7 +262,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   void _calcularTiempoEstimado() {
     if (_horaInicio.isNotEmpty && _horaFin.isNotEmpty) {
       try {
-        // Asume formato HH:MM
         final List<String> inicioParts = _horaInicio.split(':');
         final List<String> finParts = _horaFin.split(':');
 
@@ -210,34 +270,30 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
         final int finHora = int.parse(finParts[0]);
         final int finMinuto = int.parse(finParts[1]);
 
-        // Crear objetos DateTime para calcular la diferencia
-        // Usamos una fecha arbitraria (hoy) para tener un punto de referencia
         final DateTime inicio = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day, inicioHora, inicioMinuto);
         final DateTime fin = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day, finHora, finMinuto);
 
         Duration duracion;
         if (fin.isBefore(inicio)) {
-          // Si la hora de fin es anterior a la de inicio (ej. de la noche a la mañana siguiente)
           duracion = fin.add(const Duration(days: 1)).difference(inicio);
         } else {
           duracion = fin.difference(inicio);
         }
 
         final int totalMinutos = duracion.inMinutes;
-        final int horas = totalMinutos ~/ 60; // División entera para horas
-        final int minutos = totalMinutos % 60; // Resto para minutos
+        final int horas = totalMinutos ~/ 60;
+        final int minutos = totalMinutos % 60;
 
         setState(() {
           _tiempoEstimado = '${horas.toString().padLeft(2, '0')}:${minutos.toString().padLeft(2, '0')}';
-          _tiempoEstimadoController.text = _tiempoEstimado; // Actualizar el controlador
+          _tiempoEstimadoController.text = _tiempoEstimado;
         });
-
       } catch (e) {
         setState(() {
-          _tiempoEstimado = ''; // Limpiar si hay error de formato
+          _tiempoEstimado = '';
           _tiempoEstimadoController.text = 'Formato inválido';
         });
-        print('Error al parsear horas: $e'); // Usar print para depuración
+        print('Error al parsear horas: $e');
       }
     } else {
       setState(() {
@@ -247,12 +303,11 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     }
   }
 
-
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
 
-      // Recopilar datos de checkboxes
+      // Recopilar datos de checkboxes (sin cambios aquí, ya están en el modelo)
       final List<String> selectedTipoMantenimiento = _tipoMantenimientoCheckboxes.entries
           .where((entry) => entry.value)
           .map((entry) => entry.key)
@@ -272,10 +327,9 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
           .where((entry) => entry.value)
           .map((entry) => entry.key)
           .toList();
-      
-      // Crear el objeto MantenimientoRegistro
-      final registro = MantenimientoRegistro(
-        tituloReporte: 'Reporte de Mantenimiento E-PWP',
+
+      // <-- CAMBIO: Actualizar la instancia del modelo con los datos recolectados
+      _mantenimientoRegistro = _mantenimientoRegistro.copyWith(
         planta: _plantaSeleccionada,
         fecha: _fecha,
         realizadoPor: _realizadoPorSeleccionado,
@@ -297,8 +351,10 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
         tiempoEstimado: _tiempoEstimado,
         permisosRequeridos: selectedPermisosRequeridos,
         descripcionActividades: _descripcionActividades,
-        fotos: _fotos,
-        video: _video,
+        // <-- ¡Estas líneas son CRUCIALES para pasar los bytes al modelo!
+        fotosBytes: _fotosBytes,
+        videoBytes: _videoBytes,
+        // FIN CAMBIOS CLAVE
         condicionFinalEquipo: _condicionFinalEquipo,
         requiereSeguimiento: _requiereSeguimiento,
         detalleSeguimiento: _detalleSeguimiento,
@@ -308,47 +364,9 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
       );
 
       // Imprimir todos los datos recogidos (para depuración)
-      print('Datos del Reporte: ${registro.toJson()}'); // Usar print para depuración
+      print('Datos del Reporte: ${_mantenimientoRegistro.toJson()}');
 
-      // --- Simulación de envío al servidor (si tienes uno) ---
-      // Esta parte es solo para demostración. En producción, necesitarías un backend.
-      /*
-      // Asegúrate de importar 'package:http/http.dart' as http; y 'dart:convert';
-      // y de tener un servidor Flask local ejecutándose en 127.0.0.1:5000/guardar_reporte
-      http.post(
-        Uri.parse('http://127.0.0.1:5000/guardar_reporte'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode(registro.toJson()),
-      ).then((response) {
-        if (response.statusCode == 200) {
-          final responseData = json.decode(response.body);
-          print(responseData);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(responseData['mensaje'] ?? 'Reporte guardado exitosamente.')),
-            );
-          }
-        } else {
-          print('Error al guardar reporte: ${response.statusCode}');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error al guardar el reporte. Código: ${response.statusCode}')),
-            );
-          }
-        }
-      }).catchError((error) {
-        print('Error de conexión: $error');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error al enviar el reporte. Verifique la conexión al servidor.')),
-          );
-        }
-      });
-      */
-
-      // Mostrar un mensaje de éxito si la validación pasa (y no hay backend)
+      // Mostrar SnackBar de éxito
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Formulario validado y datos recogidos (revisar consola)!')),
@@ -357,28 +375,138 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     }
   }
 
-  // Función simulada para seleccionar imágenes (implementación real requiere paquetes)
-  void _pickImages() {
-    setState(() {
-      _fotos = ['path/to/imagen1.jpg', 'path/to/imagen2.png'];
+  // <-- CAMBIO MAYOR: Lógica para seleccionar MÚLTIPLES imágenes (ahora lee bytes)
+  Future<void> _pickImages() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final List<XFile> images = await picker.pickMultiImage();
+
+      if (images.isNotEmpty) {
+        List<Uint8List> tempFotosBytes = [];
+        List<String> tempFotosDisplayPaths = [];
+
+        for (XFile image in images) {
+          Uint8List bytes = await image.readAsBytes(); // ¡LEE LOS BYTES AQUÍ!
+          tempFotosBytes.add(bytes);
+
+          // Para la visualización en la UI:
+          if (kIsWeb) {
+            tempFotosDisplayPaths.add(image.path); // En web, image.path es la URL blob
+          } else {
+            tempFotosDisplayPaths.add(image.name); // En móvil/desktop, usa el nombre del archivo
+          }
+        }
+
+        setState(() {
+          _fotosBytes = tempFotosBytes;
+          _fotosDisplayPaths = tempFotosDisplayPaths;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Imágenes seleccionadas: ${_fotosBytes.length}')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se seleccionaron imágenes.')),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error al seleccionar imágenes: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Imágenes seleccionadas (simulado)!')),
+          SnackBar(content: Text('Error al acceder a las imágenes: $e')),
         );
       }
-    });
+    }
   }
-  
-  // Función simulada para seleccionar video (implementación real requiere paquetes)
-  void _pickVideo() {
-    setState(() {
-      _video = 'path/to/video.mp4';
+
+  // <-- CAMBIO MAYOR: Lógica para seleccionar UN video (ahora lee bytes)
+  Future<void> _pickVideo() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
+
+      if (video != null) {
+        Uint8List bytes = await video.readAsBytes(); // ¡LEE LOS BYTES AQUÍ!
+
+        setState(() {
+          _videoBytes = bytes;
+          if (kIsWeb) {
+            _videoDisplayPath = video.path; // En web, es la URL blob
+          } else {
+            _videoDisplayPath = video.name; // En móvil/desktop, usa el nombre del archivo
+          }
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Video seleccionado: ${_videoDisplayPath?.split('/').last}')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se seleccionó ningún video.')),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error al seleccionar video: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Video seleccionado (simulado)!')),
+          SnackBar(content: Text('Error al acceder al video: $e')),
         );
       }
-    });
+    }
+  }
+
+  // <-- NUEVO: Helper para mostrar las imágenes en la UI
+  Widget _buildAttachedImages() {
+    if (_fotosBytes.isEmpty) {
+      return const Text('No hay fotos adjuntas.');
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Imágenes adjuntas:', style: TextStyle(fontWeight: FontWeight.bold)),
+        Wrap(
+          spacing: 8.0,
+          runSpacing: 8.0,
+          children: _fotosBytes.asMap().entries.map((entry) {
+            final int index = entry.key;
+            final Uint8List bytes = entry.value;
+            final String displayPath = _fotosDisplayPaths.length > index ? _fotosDisplayPaths[index].split('/').last : 'Imagen ${index + 1}';
+
+            return Column(
+              children: [
+                // Usamos Image.memory porque funciona con Uint8List en todas las plataformas
+                Image.memory(bytes, width: 100, height: 100, fit: BoxFit.cover),
+                Text(displayPath, style: const TextStyle(fontSize: 10)),
+              ],
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  // <-- NUEVO: Helper para mostrar el video en la UI
+  Widget _buildAttachedVideo() {
+    if (_videoBytes == null) {
+      return const Text('No hay video adjunto.');
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Video adjunto:', style: TextStyle(fontWeight: FontWeight.bold)),
+        const Icon(Icons.video_file, size: 50, color: Colors.blueAccent),
+        Text(_videoDisplayPath?.split('/').last ?? 'Video', style: const TextStyle(fontSize: 10)),
+      ],
+    );
   }
 
   @override
@@ -393,40 +521,41 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                // --- 1. Encabezado del Formulario (Título fijo) ---
-                TextFormField(
-                  initialValue: 'Reporte de Mantenimiento E-PWP',
-                  enabled: false, // El título no se edita
-                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none, // Sin borde para que parezca un título
-                    contentPadding: EdgeInsets.zero,
-                  ),
+                // --- Imagen de Encabezado ---
+                // <-- CAMBIO: Asegúrate que esta ruta es correcta
+                Image.asset(
+                  'assets/images/encabezado_taric.png', // <-- ¡RUTA AJUSTADA!
+                  height: 100,
+                  width: double.infinity,
+                  fit: BoxFit.contain,
                 ),
+                const SizedBox(height: 10),
+
                 const Text(
                   'Descripción: Documentar intervenciones técnicas realizadas en planta. Por favor, complete todos los campos requeridos y adjunte los registros fotográficos.',
                   style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
                 ),
                 const SizedBox(height: 20),
 
+                // ... (El resto de tus campos de formulario, NO CAMBIAN en esta sección)
                 // --- 2. Datos Generales ---
                 const Text('Datos Generales',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const Divider(),
-                
+
                 // Campo Fecha (automático)
                 TextFormField(
                   controller: _dateController,
-                  readOnly: true, // No editable por el usuario
+                  readOnly: true,
                   decoration: const InputDecoration(
                     labelText: 'Fecha',
                     prefixIcon: Icon(Icons.calendar_today),
                   ),
                 ),
-                
+
                 // Campo Planta
                 DropdownButtonFormField<String>(
-                  value: _plantaSeleccionada.isEmpty ? null : _plantaSeleccionada, // Asegura que el valor inicial sea null si está vacío
+                  value: _plantaSeleccionada.isEmpty ? null : _plantaSeleccionada,
                   decoration: const InputDecoration(labelText: 'Planta'),
                   items: _plantas.map<DropdownMenuItem<String>>((String value) {
                     return DropdownMenuItem<String>(
@@ -444,10 +573,10 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                       : null,
                 ),
 
-                // Campo realizadoPor
+                // Campo Realizado por
                 DropdownButtonFormField<String>(
                   value: _realizadoPorSeleccionado.isEmpty ? null : _realizadoPorSeleccionado,
-                  decoration: const InputDecoration(labelText: 'Realizado Por'),
+                  decoration: const InputDecoration(labelText: 'Realizado por'),
                   items: _realizadoPor.map<DropdownMenuItem<String>>((String value) {
                     return DropdownMenuItem<String>(
                       value: value,
@@ -460,7 +589,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                     });
                   },
                   validator: (value) => value == null || value.isEmpty
-                      ? 'Seleccione un respopnsable'
+                      ? 'Seleccione el personal responsable'
                       : null,
                 ),
 
@@ -522,7 +651,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                     if (textEditingValue.text.isEmpty) {
                       return const Iterable<String>.empty();
                     }
-                    // Filtra las opciones basadas en el texto digitado
                     return _ubicacionesTecnicasOpciones.where((String option) {
                       return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
                     });
@@ -538,7 +666,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                       TextEditingController fieldTextEditingController,
                       FocusNode fieldFocusNode,
                       VoidCallback onFieldSubmitted) {
-                    // Este es el TextFormField que el usuario ve y edita
                     return TextFormField(
                       controller: fieldTextEditingController,
                       focusNode: fieldFocusNode,
@@ -547,19 +674,15 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                         hintText: 'Digite para buscar...',
                       ),
                       validator: (value) {
-                        // Valida si el valor seleccionado está en la lista de opciones válidas
                         if (value == null || value.isEmpty) {
                           return 'Seleccione una ubicación';
                         }
-                        // Solo valida si la opción existe en el mapa de descripciones
                         if (!_ubicacionDescripcionMap.containsKey(value)) {
                           return 'Ubicación no válida';
                         }
                         return null;
                       },
                       onChanged: (value) {
-                        // Limpia la descripción si el usuario cambia el texto
-                        // antes de seleccionar una opción válida
                         if (!_ubicacionDescripcionMap.containsKey(value)) {
                           setState(() {
                             _descripcionUbicacion = '';
@@ -575,13 +698,12 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                   optionsViewBuilder: (BuildContext context,
                       AutocompleteOnSelected<String> onSelected,
                       Iterable<String> options) {
-                    // Este es el cuadro que muestra las opciones filtradas
                     return Align(
                       alignment: Alignment.topLeft,
                       child: Material(
                         elevation: 4.0,
                         child: SizedBox(
-                          height: 200.0, // Altura máxima para la lista de opciones
+                          height: 200.0,
                           child: ListView.builder(
                             padding: EdgeInsets.zero,
                             itemCount: options.length,
@@ -602,12 +724,12 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                     );
                   },
                 ),
-                
+
                 // Campo Descripción (se actualiza automáticamente)
                 TextFormField(
                   controller: _descripcionUbicacionController,
                   decoration: const InputDecoration(labelText: 'Descripción (automática)'),
-                  enabled: false, // No editable por el usuario
+                  enabled: false,
                   onSaved: (newValue) => _descripcionUbicacion = newValue!,
                 ),
                 const SizedBox(height: 20),
@@ -616,14 +738,14 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                 const Text('Detalles del Mantenimiento',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const Divider(),
-                
+
                 // Tipo de Mantenimiento (Checkboxes)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8.0),
                   child: Text('Tipo de Mantenimiento:', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
                 Wrap(
-                  spacing: 10.0, // Espacio horizontal entre checkboxes
+                  spacing: 10.0,
                   children: _tipoMantenimientoCheckboxes.keys.map((String key) {
                     return Row(
                       mainAxisSize: MainAxisSize.min,
@@ -770,8 +892,8 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // --- Horas de Intervención ---
-                const Text('Duración de la Intervención', // Título actualizado
+                // --- Duración de la Intervención ---
+                const Text('Duración de la Intervención',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const Divider(),
                 Row(
@@ -783,7 +905,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                         validator: (value) => value == null || value.isEmpty
                             ? 'Ingrese hora de inicio'
                             : null,
-                        onChanged: (value) { // Para calcular automáticamente
+                        onChanged: (value) {
                           _horaInicio = value;
                           _calcularTiempoEstimado();
                         },
@@ -797,7 +919,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                         validator: (value) => value == null || value.isEmpty
                             ? 'Ingrese hora de fin'
                             : null,
-                        onChanged: (value) { // Para calcular automáticamente
+                        onChanged: (value) {
                           _horaFin = value;
                           _calcularTiempoEstimado();
                         },
@@ -806,14 +928,13 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                   ],
                 ),
                 TextFormField(
-                  controller: _tiempoEstimadoController, // Controlador para mostrar el valor calculado
-                  readOnly: true, // Campo de solo lectura
+                  controller: _tiempoEstimadoController,
+                  readOnly: true,
                   decoration: const InputDecoration(labelText: 'Tiempo estimado de intervención (HH:MM)'),
                   onSaved: (newValue) => _tiempoEstimado = newValue!,
-                  // Ya no se necesita validación manual aquí
                 ),
                 const SizedBox(height: 20),
-                
+
                 // --- Permisos Requeridos ---
                 const Text('Permisos Requeridos',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
@@ -856,39 +977,27 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // --- Evidencia ---
+                // --- Adjuntos ---
                 const Text('Adjuntos',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const Divider(),
-                
+
                 ElevatedButton.icon(
                   onPressed: _pickImages,
                   icon: const Icon(Icons.image),
                   label: const Text('Adjuntar Fotos (Antes/Durante/Después)'),
                 ),
-                if (_fotos.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Imágenes adjuntas:'),
-                        ..._fotos.map((path) => Text(path)),
-                      ],
-                    ),
-                  ),
-
                 const SizedBox(height: 10),
+                _buildAttachedImages(), // <-- Muestra las fotos adjuntas
+                const SizedBox(height: 20),
+
                 ElevatedButton.icon(
                   onPressed: _pickVideo,
                   icon: const Icon(Icons.video_collection),
                   label: const Text('Cargar Video Corto (Opcional)'),
                 ),
-                 if (_video != null && _video!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Text('Video adjunto: $_video'),
-                  ),
+                const SizedBox(height: 10),
+                _buildAttachedVideo(), // <-- Muestra el video adjunto
                 const SizedBox(height: 20),
 
                 // --- Evaluación Técnica ---
@@ -913,7 +1022,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                       ? 'Seleccione la condición final'
                       : null,
                 ),
-                
+
                 DropdownButtonFormField<String>(
                   value: _requiereSeguimiento.isEmpty ? null : _requiereSeguimiento,
                   decoration: const InputDecoration(labelText: '¿Requiere seguimiento?'),
@@ -942,7 +1051,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                         ? 'Ingrese el detalle del seguimiento'
                         : null,
                   ),
-                
+
                 TextFormField(
                   decoration: const InputDecoration(
                     labelText: 'Riesgos observados (si aplica):',
@@ -975,17 +1084,101 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // --- Botón de Guardar ---
+                // --- Botones de Acción ---
                 Center(
-                  child: ElevatedButton(
-                    onPressed: _submitForm,
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                      child: Text('Guardar Reporte', style: TextStyle(fontSize: 18)),
-                    ),
+                  child: Column(
+                    children: [
+                      ElevatedButton(
+                        onPressed: _submitForm,
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                          child: Text('Guardar Reporte', style: TextStyle(fontSize: 18)),
+                        ),
+                      ),
+                      const SizedBox(height: 20), // Espacio entre botones
+
+                      // <-- NUEVO: Botón para Generar Reporte PDF
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          if (_formKey.currentState!.validate()) {
+                            _formKey.currentState!.save();
+                            // Asegurarse de que el modelo _mantenimientoRegistro tenga todos los datos
+                            // (Ya se actualiza en _submitForm, pero si este botón se presiona antes,
+                            // o si quieres que sea independiente del "Guardar", se puede llamar _submitForm aquí)
+                            
+                            // Re-crear el objeto MantenimientoRegistro con los datos actuales del estado
+                            // Esto es redundante si _submitForm ya se ha llamado, pero seguro.
+                             final currentRegistro = MantenimientoRegistro(
+                                tituloReporte: 'Reporte de Mantenimiento E-PWP',
+                                planta: _plantaSeleccionada,
+                                fecha: _fecha,
+                                realizadoPor: _realizadoPorSeleccionado,
+                                ayudante: _ayudanteSeleccionado,
+                                orden: _orden,
+                                area: _areaSeleccionada,
+                                ubicacionTecnica: _ubicacionTecnicaSeleccionada,
+                                descripcionUbicacion: _descripcionUbicacion,
+                                tipoMantenimiento: _tipoMantenimientoCheckboxes.entries.where((entry) => entry.value).map((entry) => entry.key).toList(),
+                                condicionEncontrada: _condicionEncontrada,
+                                estadoEquipo: _estadoEquipoCheckboxes.entries.where((entry) => entry.value).map((entry) => entry.key).toList(),
+                                existeAveria: _existeAveria,
+                                descripcionProblema: _descripcionProblema,
+                                accionesRealizadas: _accionesRealizadasCheckboxes.entries.where((entry) => entry.value).map((entry) => entry.key).toList(),
+                                otroAccionTexto: _otroAccionTexto,
+                                materialesRepuestos: _materialesRepuestos,
+                                horaInicio: _horaInicio,
+                                horaFin: _horaFin,
+                                tiempoEstimado: _tiempoEstimado,
+                                permisosRequeridos: _permisosRequeridosCheckboxes.entries.where((entry) => entry.value).map((entry) => entry.key).toList(),
+                                descripcionActividades: _descripcionActividades,
+                                fotosBytes: _fotosBytes, // ¡Aquí pasamos los bytes!
+                                videoBytes: _videoBytes, // ¡Aquí pasamos los bytes!
+                                condicionFinalEquipo: _condicionFinalEquipo,
+                                requiereSeguimiento: _requiereSeguimiento,
+                                detalleSeguimiento: _detalleSeguimiento,
+                                riesgosObservados: _riesgosObservados,
+                                accionesSugeridasCortoPlazo: _accionesSugeridasCortoPlazo,
+                                sugerenciasMejoraRedisenio: _sugerenciasMejoraRedisenio,
+                              );
+
+
+                            try {
+                              final pdfBytes = await PdfGenerator.generateMantenimientoPdf(currentRegistro); // <-- Pasa el modelo completo
+
+                              if (kIsWeb) {
+                                // Para web, usa printing para abrir en una nueva pestaña o descargar
+                                await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdfBytes);
+                              } else {
+                                // Para móvil/desktop, guarda el archivo y luego compártelo
+                                final directory = await getApplicationDocumentsDirectory(); // O getTemporaryDirectory()
+                                final file = File('${directory.path}/reporte_mantenimiento_${DateTime.now().millisecondsSinceEpoch}.pdf');
+                                await file.writeAsBytes(pdfBytes);
+
+                                // Compartir el archivo
+                                await Share.shareXFiles([XFile(file.path)], subject: 'Reporte de Mantenimiento');
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('PDF generado y listo para compartir!')),
+                                );
+                              }
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error al generar PDF: $e')),
+                              );
+                              print('Error al generar PDF: $e');
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.picture_as_pdf),
+                        label: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+                          child: Text('Generar Reporte PDF', style: TextStyle(fontSize: 18)),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 40), // Espacio al final del formulario
+                const SizedBox(height: 40),
               ],
             ),
           ),
@@ -994,3 +1187,76 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     );
   }
 }
+
+// *** IMPORTANTE: Asegúrate de que esta extensión está en tu archivo `mantenimiento_registro.dart` ***
+// No la pongas aquí en `mantenimiento_form_screen.dart`
+// Pégala DENTRO de `lib/models/mantenimiento_registro.dart`
+/*
+extension MantenimientoRegistroCopyWith on MantenimientoRegistro {
+  MantenimientoRegistro copyWith({
+    String? tituloReporte,
+    String? planta,
+    String? fecha,
+    String? realizadoPor,
+    String? ayudante,
+    String? orden,
+    String? area,
+    String? ubicacionTecnica,
+    String? descripcionUbicacion,
+    List<String>? tipoMantenimiento,
+    String? condicionEncontrada,
+    List<String>? estadoEquipo,
+    String? existeAveria,
+    String? descripcionProblema,
+    List<String>? accionesRealizadas,
+    String? otroAccionTexto,
+    String? materialesRepuestos,
+    String? horaInicio,
+    String? horaFin,
+    String? tiempoEstimado,
+    List<String>? permisosRequeridos,
+    String? descripcionActividades,
+    List<Uint8List>? fotosBytes,
+    Uint8List? videoBytes,
+    String? condicionFinalEquipo,
+    String? requiereSeguimiento,
+    String? detalleSeguimiento,
+    String? riesgosObservados,
+    String? accionesSugeridasCortoPlazo,
+    String? sugerenciasMejoraRedisenio,
+  }) {
+    return MantenimientoRegistro(
+      tituloReporte: tituloReporte ?? this.tituloReporte,
+      planta: planta ?? this.planta,
+      fecha: fecha ?? this.fecha,
+      realizadoPor: realizadoPor ?? this.realizadoPor,
+      ayudante: ayudante ?? this.ayudante,
+      orden: orden ?? this.orden,
+      area: area ?? this.area,
+      ubicacionTecnica: ubicacionTecnica ?? this.ubicacionTecnica,
+      descripcionUbicacion: descripcionUbicacion ?? this.descripcionUbicacion,
+      tipoMantenimiento: tipoMantenimiento ?? this.tipoMantenimiento,
+      condicionEncontrada: condicionEncontrada ?? this.condicionEncontrada,
+      estadoEquipo: estadoEquipo ?? this.estadoEquipo,
+      existeAveria: existeAveria ?? this.existeAveria,
+      descripcionProblema: descripcionProblema ?? this.descripcionProblema,
+      accionesRealizadas: accionesRealizadas ?? this.accionesRealizadas,
+      otroAccionTexto: otroAccionTexto ?? this.otroAccionTexto,
+      materialesRepuestos: materialesRepuestos ?? this.materialesRepuestos,
+      horaInicio: horaInicio ?? this.horaInicio,
+      horaFin: horaFin ?? this.horaFin,
+      tiempoEstimado: tiempoEstimado ?? this.tiempoEstimado,
+      permisosRequeridos: permisosRequeridos ?? this.permisosRequeridos,
+      descripcionActividades: descripcionActividades ?? this.descripcionActividades,
+      fotosBytes: fotosBytes ?? this.fotosBytes,
+      videoBytes: videoBytes ?? this.videoBytes,
+      condicionFinalEquipo: condicionFinalEquipo ?? this.condicionFinalEquipo,
+      requiereSeguimiento: requiereSeguimiento ?? this.requiereSeguimiento,
+      detalleSeguimiento: detalleSeguimiento ?? this.detalleSeguimiento,
+      riesgosObservados: riesgosObservados ?? this.riesgosObservados,
+      accionesSugeridasCortoPlazo: accionesSugeridasCortoPlazo ?? this.accionesSugeridasCortoPlazo,
+      sugerenciasMejoraRedisenio: sugerenciasMejoraRedisenio ?? this.sugerenciasMejoraRedisenio,
+    );
+  }
+}
+*/
