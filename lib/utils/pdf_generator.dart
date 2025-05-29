@@ -36,7 +36,7 @@ class PdfGenerator {
               pw.SizedBox(height: 5),
               pw.Center(
                 child: pw.Text(
-                  'Mantenimiento',
+                  'Reporte de Mantenimiento', // Título principal del reporte
                   style: pw.TextStyle(
                     fontSize: 20,
                     fontWeight: pw.FontWeight.bold,
@@ -59,7 +59,20 @@ class PdfGenerator {
           );
         },
         build: (pw.Context context) => [ // build ahora devuelve una lista de widgets
-          // Aquí va todo el contenido que quieres que fluya a través de las páginas
+          // --- NUEVO TEXTO DESCRIPTIVO ---
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: pw.Text(
+              "Este reporte informativo resume las acciones realizadas durante la intervención del equipo, proporcionando una visión general de los hallazgos encontrados, las tareas ejecutadas y las recomendaciones para el sistema intervenido. La información contenida en este documento es resultado del trabajo colaborativo entre los equipos de mantenimiento y operación, generando una herramienta de consulta para todos.",
+              textAlign: pw.TextAlign.justify, // <-- Alineación justificada
+              style: pw.TextStyle(
+                fontSize: 10, // <-- Letra más pequeña
+                color: customBlue, // <-- Mismo color
+              ),
+            ),
+          ),
+          pw.SizedBox(height: 15), // Espacio después del texto descriptivo
+          // --- FIN NUEVO TEXTO DESCRIPTIVO ---
           
           // --- Datos Generales ---
           pw.Text('Datos Generales', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
@@ -131,7 +144,7 @@ class PdfGenerator {
           pw.SizedBox(height: 10),
 
           // --- Evidencia de Video (Ahora condicional) ---
-          if (registro.videoBytes != null) // <--- CAMBIO CLAVE AQUÍ: Solo muestra la sección si hay video
+          if (registro.videoBytes != null)
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
