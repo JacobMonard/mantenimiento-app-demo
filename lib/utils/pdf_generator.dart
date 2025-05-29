@@ -34,16 +34,7 @@ class PdfGenerator {
                 ),
               ),
               pw.SizedBox(height: 5),
-              pw.Center(
-                child: pw.Text(
-                  'Reporte de Mantenimiento', // Título principal del reporte
-                  style: pw.TextStyle(
-                    fontSize: 20,
-                    fontWeight: pw.FontWeight.bold,
-                    color: customBlue,
-                  ),
-                ),
-              ),
+              
               pw.SizedBox(height: 10),
               pw.Divider(),
             ],
@@ -66,7 +57,7 @@ class PdfGenerator {
               "Este reporte informativo resume las acciones realizadas durante la intervención del equipo, proporcionando una visión general de los hallazgos encontrados, las tareas ejecutadas y las recomendaciones para el sistema intervenido. La información contenida en este documento es resultado del trabajo colaborativo entre los equipos de mantenimiento y operación, generando una herramienta de consulta para todos.",
               textAlign: pw.TextAlign.justify, // <-- Alineación justificada
               style: pw.TextStyle(
-                fontSize: 10, // <-- Letra más pequeña
+                fontSize: 12, // <-- Letra más pequeña
                 color: customBlue, // <-- Mismo color
               ),
             ),
@@ -124,7 +115,7 @@ class PdfGenerator {
           pw.SizedBox(height: 10),
 
           // --- Evidencia Fotográfica ---
-          pw.Text('Evidencia Fotográfica', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+          pw.Text('Imágenes', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 5),
           ...registro.fotosBytes.map((bytes) {
             try {
@@ -148,7 +139,7 @@ class PdfGenerator {
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text('Evidencia de Video', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                pw.Text('Videos', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 5),
                 pw.Text('Video adjunto (no reproducible directamente en PDF).', style: const pw.TextStyle(fontSize: 12, fontStyle: pw.FontStyle.italic)),
                 pw.SizedBox(height: 10),
