@@ -28,17 +28,14 @@ class MantenimientoRegistro {
   // 6. Acciones Realizadas
   final List<String> accionesRealizadas;
   final String? otroAccionTexto;
-  final String materialesRepuestos;
   final String horaInicio;
   final String horaFin;
   final String? tiempoEstimado;
-  final List<String> permisosRequeridos;
-  final String descripcionActividades;
+    final String descripcionActividades;
 
   // 7. Evidencia
   final List<Uint8List> fotosBytes; // <-- CAMBIO: Ahora guarda los bytes de las fotos
-  final Uint8List? videoBytes; // <-- CAMBIO: Ahora guarda los bytes del video
-
+  
   // 8. Evaluación Técnica
   final String condicionFinalEquipo;
   final String requiereSeguimiento;
@@ -46,9 +43,8 @@ class MantenimientoRegistro {
   final String? riesgosObservados;
 
   // 9. Recomendaciones
-  final String? accionesSugeridasCortoPlazo;
-  final String? sugerenciasMejoraRedisenio;
-
+  final String? accionesSugeridas;
+  
 
   MantenimientoRegistro({
     this.tituloReporte,
@@ -67,20 +63,16 @@ class MantenimientoRegistro {
     required this.descripcionProblema,
     required this.accionesRealizadas,
     this.otroAccionTexto,
-    required this.materialesRepuestos,
     required this.horaInicio,
     required this.horaFin,
     this.tiempoEstimado,
-    required this.permisosRequeridos,
     required this.descripcionActividades,
     this.fotosBytes = const [], // <-- CAMBIO: Inicialización para el nuevo tipo
-    this.videoBytes, // <-- CAMBIO: Para el nuevo tipo
     required this.condicionFinalEquipo,
     required this.requiereSeguimiento,
     this.detalleSeguimiento,
     this.riesgosObservados,
-    this.accionesSugeridasCortoPlazo,
-    this.sugerenciasMejoraRedisenio,
+    this.accionesSugeridas,
   });
 
   // Método para convertir el objeto a un mapa (útil para guardar o enviar)
@@ -102,22 +94,17 @@ class MantenimientoRegistro {
       'descripcionProblema': descripcionProblema,
       'accionesRealizadas': accionesRealizadas,
       'otroAccionTexto': otroAccionTexto,
-      'materialesRepuestos': materialesRepuestos,
       'horaInicio': horaInicio,
       'horaFin': horaFin,
       'tiempoEstimado': tiempoEstimado,
-      'permisosRequeridos': permisosRequeridos,
       'descripcionActividades': descripcionActividades,
       // <-- CAMBIOS CLAVE AQUÍ: Codificación a Base64 para JSON
       'fotosBytes': fotosBytes.map((bytes) => base64Encode(bytes)).toList(),
-      'videoBytes': videoBytes != null ? base64Encode(videoBytes!) : null,
       // FIN CAMBIOS CLAVE
       'condicionFinalEquipo': condicionFinalEquipo,
       'requiereSeguimiento': requiereSeguimiento,
       'detalleSeguimiento': detalleSeguimiento,
-      'riesgosObservados': riesgosObservados,
-      'accionesSugeridasCortoPlazo': accionesSugeridasCortoPlazo,
-      'sugerenciasMejoraRedisenio': sugerenciasMejoraRedisenio,
+      'accionesSugeridas': accionesSugeridas,
     };
   }
 
@@ -156,20 +143,15 @@ extension MantenimientoRegistroCopyWith on MantenimientoRegistro {
     String? descripcionProblema,
     List<String>? accionesRealizadas,
     String? otroAccionTexto,
-    String? materialesRepuestos,
     String? horaInicio,
     String? horaFin,
     String? tiempoEstimado,
-    List<String>? permisosRequeridos,
     String? descripcionActividades,
     List<Uint8List>? fotosBytes,
-    Uint8List? videoBytes,
     String? condicionFinalEquipo,
     String? requiereSeguimiento,
     String? detalleSeguimiento,
-    String? riesgosObservados,
-    String? accionesSugeridasCortoPlazo,
-    String? sugerenciasMejoraRedisenio,
+    String? accionesSugeridas,
   }) {
     return MantenimientoRegistro(
       tituloReporte: tituloReporte ?? this.tituloReporte,
@@ -188,20 +170,16 @@ extension MantenimientoRegistroCopyWith on MantenimientoRegistro {
       descripcionProblema: descripcionProblema ?? this.descripcionProblema,
       accionesRealizadas: accionesRealizadas ?? this.accionesRealizadas,
       otroAccionTexto: otroAccionTexto ?? this.otroAccionTexto,
-      materialesRepuestos: materialesRepuestos ?? this.materialesRepuestos,
       horaInicio: horaInicio ?? this.horaInicio,
       horaFin: horaFin ?? this.horaFin,
       tiempoEstimado: tiempoEstimado ?? this.tiempoEstimado,
-      permisosRequeridos: permisosRequeridos ?? this.permisosRequeridos,
       descripcionActividades: descripcionActividades ?? this.descripcionActividades,
       fotosBytes: fotosBytes ?? this.fotosBytes,
-      videoBytes: videoBytes ?? this.videoBytes,
       condicionFinalEquipo: condicionFinalEquipo ?? this.condicionFinalEquipo,
       requiereSeguimiento: requiereSeguimiento ?? this.requiereSeguimiento,
       detalleSeguimiento: detalleSeguimiento ?? this.detalleSeguimiento,
       riesgosObservados: riesgosObservados ?? this.riesgosObservados,
-      accionesSugeridasCortoPlazo: accionesSugeridasCortoPlazo ?? this.accionesSugeridasCortoPlazo,
-      sugerenciasMejoraRedisenio: sugerenciasMejoraRedisenio ?? this.sugerenciasMejoraRedisenio,
+      accionesSugeridas: accionesSugeridas ?? this.accionesSugeridas,
     );
   }
 }
