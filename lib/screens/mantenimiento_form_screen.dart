@@ -29,6 +29,8 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _descripcionUbicacionController = TextEditingController();
   final TextEditingController _tiempoEstimadoController = TextEditingController();
+  final List<String> _horas = List.generate(24, (i) => i.toString().padLeft(2, '0'));
+  final List<String> _minutos = ['00', '30'];
 
   // Instancia del modelo para guardar los datos
   // <-- CAMBIO: Inicializa una instancia de tu modelo para ir guardando los datos.
@@ -76,43 +78,26 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     'Otro': false,
   };
   String _otroAccionTexto = '';
-  String _materialesRepuestos = '';
   String _horaInicio = '';
   String _horaFin = '';
   String _tiempoEstimado = '';
-  final Map<String, bool> _permisosRequeridosCheckboxes = {
-    'LOTOTO': false,
-    'Espacio confinado': false,
-    'Trabajo en caliente': false,
-    'Alturas': false,
-    'Sustancias Químicas': false,
-    'Ingreso a patios': false,
-    'Izar Cargas': false,
-    'Ingreso Cuartos Eléctricos': false,
-    'Subestaciones': false,
-    'Ninguno': false,
-  };
   String _descripcionActividades = '';
 
   // 7. Evidencia (rutas de los archivos seleccionados)
   // <-- CAMBIO: Almacenaremos los bytes, no solo las rutas String
   List<Uint8List> _fotosBytes = [];
-  Uint8List? _videoBytes; // <-- CAMBIO: Almacenaremos los bytes del video
-
+  
   // <-- NUEVO: Variables para mostrar las rutas/URLs en la UI
   List<String> _fotosDisplayPaths = [];
-  String? _videoDisplayPath;
-
+  
   // 8. Evaluación Técnica
   String _condicionFinalEquipo = '';
   String _requiereSeguimiento = 'No';
   String _detalleSeguimiento = '';
-  String _riesgosObservados = '';
-
+  
   // 9. Recomendaciones
-  String _accionesSugeridasCortoPlazo = '';
-  String _sugerenciasMejoraRedisenio = '';
-
+  String _accionesSugeridas = '';
+  
   // Listas de opciones estáticas (para Spinners/Dropdowns)
   final List<String> _plantas = [
     'Energía & Planta de Fuerza', 'Pulpapel', 'Molino 1', 'Molino 3',
@@ -166,20 +151,15 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
       existeAveria: 'No',
       descripcionProblema: '',
       accionesRealizadas: [],
-      materialesRepuestos: '',
       horaInicio: '',
       horaFin: '',
       tiempoEstimado: '',
-      permisosRequeridos: [],
       descripcionActividades: '',
       fotosBytes: [], // Inicializa la lista de bytes vacía
-      videoBytes: null, // Inicializa el video como nulo
       condicionFinalEquipo: _condicionesFinalesEquipo.isNotEmpty ? _condicionesFinalesEquipo.first : '',
       requiereSeguimiento: 'No',
       detalleSeguimiento: '',
-      riesgosObservados: '',
-      accionesSugeridasCortoPlazo: '',
-      sugerenciasMejoraRedisenio: '',
+      accionesSugeridas: '',
     );
 
     // Actualizar los valores iniciales de los dropdowns si _mantenimientoRegistro ya tiene datos
@@ -260,6 +240,8 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   }
 
   void _calcularTiempoEstimado() {
+    // Asegurarse de que ambos valores de hora de inicio y fin hayan sido seleccionados.
+    // Si no lo están, el tiempo estimado se limpia.
     if (_horaInicio.isNotEmpty && _horaFin.isNotEmpty) {
       try {
         final List<String> inicioParts = _horaInicio.split(':');
@@ -270,32 +252,36 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
         final int finHora = int.parse(finParts[0]);
         final int finMinuto = int.parse(finParts[1]);
 
-        final DateTime inicio = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day, inicioHora, inicioMinuto);
-        final DateTime fin = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day, finHora, finMinuto);
+        // CAMBIO IMPORTANTE AQUÍ: Usamos una fecha ficticia para el cálculo
+        // Esto evita problemas si el cálculo se hace en un cambio de día real
+        final DateTime dummyDate = DateTime(2000, 1, 1);
+        final DateTime startTime = DateTime(dummyDate.year, dummyDate.month, dummyDate.day, inicioHora, inicioMinuto);
+        DateTime endTime = DateTime(dummyDate.year, dummyDate.month, dummyDate.day, finHora, finMinuto);
 
-        Duration duracion;
-        if (fin.isBefore(inicio)) {
-          duracion = fin.add(const Duration(days: 1)).difference(inicio);
-        } else {
-          duracion = fin.difference(inicio);
+        // Si la hora de fin es anterior a la de inicio (ej. inicia a las 23:00 y termina a las 01:00),
+        // asumimos que termina al día siguiente para el cálculo de la duración.
+        if (endTime.isBefore(startTime)) {
+          endTime = endTime.add(const Duration(days: 1));
         }
 
-        final int totalMinutos = duracion.inMinutes;
-        final int horas = totalMinutos ~/ 60;
-        final int minutos = totalMinutos % 60;
+        final Duration duration = endTime.difference(startTime);
+        final int hours = duration.inHours;
+        final int minutes = duration.inMinutes.remainder(60);
 
         setState(() {
-          _tiempoEstimado = '${horas.toString().padLeft(2, '0')}:${minutos.toString().padLeft(2, '0')}';
-          _tiempoEstimadoController.text = _tiempoEstimado;
+          _tiempoEstimado = '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
+          _tiempoEstimadoController.text = _tiempoEstimado; // Actualiza el controlador del TextFormField
         });
       } catch (e) {
+        // En caso de algún error inesperado en el cálculo (poco probable con Dropdowns).
         setState(() {
-          _tiempoEstimado = '';
-          _tiempoEstimadoController.text = 'Formato inválido';
+          _tiempoEstimado = ''; // Limpiar si hay error
+          _tiempoEstimadoController.text = 'Error en el cálculo'; // Mensaje de error
         });
-        print('Error al parsear horas: $e');
+        print('Error al calcular tiempo: $e'); // Para depuración
       }
     } else {
+      // Si alguna de las horas no ha sido seleccionada, limpiamos el campo de tiempo estimado.
       setState(() {
         _tiempoEstimado = '';
         _tiempoEstimadoController.text = '';
@@ -323,11 +309,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
           .map((entry) => entry.key)
           .toList();
 
-      final List<String> selectedPermisosRequeridos = _permisosRequeridosCheckboxes.entries
-          .where((entry) => entry.value)
-          .map((entry) => entry.key)
-          .toList();
-
       // <-- CAMBIO: Actualizar la instancia del modelo con los datos recolectados
       _mantenimientoRegistro = _mantenimientoRegistro.copyWith(
         planta: _plantaSeleccionada,
@@ -345,22 +326,17 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
         descripcionProblema: _descripcionProblema,
         accionesRealizadas: selectedAccionesRealizadas,
         otroAccionTexto: _otroAccionTexto,
-        materialesRepuestos: _materialesRepuestos,
         horaInicio: _horaInicio,
         horaFin: _horaFin,
         tiempoEstimado: _tiempoEstimado,
-        permisosRequeridos: selectedPermisosRequeridos,
         descripcionActividades: _descripcionActividades,
         // <-- ¡Estas líneas son CRUCIALES para pasar los bytes al modelo!
         fotosBytes: _fotosBytes,
-        videoBytes: _videoBytes,
         // FIN CAMBIOS CLAVE
         condicionFinalEquipo: _condicionFinalEquipo,
         requiereSeguimiento: _requiereSeguimiento,
         detalleSeguimiento: _detalleSeguimiento,
-        riesgosObservados: _riesgosObservados,
-        accionesSugeridasCortoPlazo: _accionesSugeridasCortoPlazo,
-        sugerenciasMejoraRedisenio: _sugerenciasMejoraRedisenio,
+        accionesSugeridas: _accionesSugeridas,
       );
 
       // Imprimir todos los datos recogidos (para depuración)
@@ -424,46 +400,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     }
   }
 
-  // <-- CAMBIO MAYOR: Lógica para seleccionar UN video (ahora lee bytes)
-  Future<void> _pickVideo() async {
-    final ImagePicker picker = ImagePicker();
-    try {
-      final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
-
-      if (video != null) {
-        Uint8List bytes = await video.readAsBytes(); // ¡LEE LOS BYTES AQUÍ!
-
-        setState(() {
-          _videoBytes = bytes;
-          if (kIsWeb) {
-            _videoDisplayPath = video.path; // En web, es la URL blob
-          } else {
-            _videoDisplayPath = video.name; // En móvil/desktop, usa el nombre del archivo
-          }
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Video seleccionado: ${_videoDisplayPath?.split('/').last}')),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No se seleccionó ningún video.')),
-          );
-        }
-      }
-    } catch (e) {
-      print('Error al seleccionar video: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al acceder al video: $e')),
-        );
-      }
-    }
-  }
-
   // <-- NUEVO: Helper para mostrar las imágenes en la UI
   Widget _buildAttachedImages() {
     if (_fotosBytes.isEmpty) {
@@ -490,21 +426,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
             );
           }).toList(),
         ),
-      ],
-    );
-  }
-
-  // <-- NUEVO: Helper para mostrar el video en la UI
-  Widget _buildAttachedVideo() {
-    if (_videoBytes == null) {
-      return const Text('No hay video adjunto.');
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Video adjunto:', style: TextStyle(fontWeight: FontWeight.bold)),
-        const Icon(Icons.video_file, size: 50, color: Colors.blueAccent),
-        Text(_videoDisplayPath?.split('/').last ?? 'Video', style: const TextStyle(fontSize: 10)),
       ],
     );
   }
@@ -878,87 +799,74 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // --- Materiales/Repuestos utilizados ---
-                const Text('Materiales/Repuestos utilizados',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const Divider(),
-                TextFormField(
-                  decoration: const InputDecoration(
-                    labelText: 'Detalle los materiales/repuestos utilizados:',
-                    border: OutlineInputBorder(),
+               // --- Duración de la Intervención ---
+              const Text('Duración de la Intervención',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const Divider(),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>( // CAMBIO: Ahora es un Dropdown
+                      value: _horaInicio.isEmpty ? null : _horaInicio,
+                      decoration: const InputDecoration(
+                        labelText: 'Hora de inicio',
+                        hintText: 'Seleccione la hora', // Texto guía para el usuario
+                      ),
+                      // Genera todas las combinaciones de horas y minutos (ej. "00:00", "00:30", "01:00", etc.)
+                      items: _horas.expand((h) => _minutos.map((m) => '$h:$m'))
+                          .map<DropdownMenuItem<String>>((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _horaInicio = newValue!;
+                          _calcularTiempoEstimado(); // Recalcula el tiempo al cambiar
+                        });
+                      },
+                      validator: (value) => value == null || value.isEmpty
+                          ? 'Seleccione hora de inicio'
+                          : null,
+                    ),
                   ),
-                  maxLines: 5,
-                  onSaved: (newValue) => _materialesRepuestos = newValue!,
-                ),
-                const SizedBox(height: 20),
-
-                // --- Duración de la Intervención ---
-                const Text('Duración de la Intervención',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const Divider(),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        decoration: const InputDecoration(labelText: 'Hora de inicio (HH:MM)'),
-                        onSaved: (newValue) => _horaInicio = newValue!,
-                        validator: (value) => value == null || value.isEmpty
-                            ? 'Ingrese hora de inicio'
-                            : null,
-                        onChanged: (value) {
-                          _horaInicio = value;
-                          _calcularTiempoEstimado();
-                        },
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonFormField<String>( // CAMBIO: Ahora es un Dropdown
+                      value: _horaFin.isEmpty ? null : _horaFin,
+                      decoration: const InputDecoration(
+                        labelText: 'Hora de fin',
+                        hintText: 'Seleccione la hora', // Texto guía para el usuario
                       ),
+                      // Genera todas las combinaciones de horas y minutos
+                      items: _horas.expand((h) => _minutos.map((m) => '$h:$m'))
+                          .map<DropdownMenuItem<String>>((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _horaFin = newValue!;
+                          _calcularTiempoEstimado(); // Recalcula el tiempo al cambiar
+                        });
+                      },
+                      validator: (value) => value == null || value.isEmpty
+                          ? 'Seleccione hora de fin'
+                          : null,
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextFormField(
-                        decoration: const InputDecoration(labelText: 'Hora de fin (HH:MM)'),
-                        onSaved: (newValue) => _horaFin = newValue!,
-                        validator: (value) => value == null || value.isEmpty
-                            ? 'Ingrese hora de fin'
-                            : null,
-                        onChanged: (value) {
-                          _horaFin = value;
-                          _calcularTiempoEstimado();
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                TextFormField(
-                  controller: _tiempoEstimadoController,
-                  readOnly: true,
-                  decoration: const InputDecoration(labelText: 'Tiempo estimado de intervención (HH:MM)'),
-                  onSaved: (newValue) => _tiempoEstimado = newValue!,
-                ),
-                const SizedBox(height: 20),
-
-                // --- Permisos Requeridos ---
-                const Text('Permisos Requeridos',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const Divider(),
-                Wrap(
-                  spacing: 10.0,
-                  children: _permisosRequeridosCheckboxes.keys.map((String key) {
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Checkbox(
-                          value: _permisosRequeridosCheckboxes[key],
-                          onChanged: (bool? newValue) {
-                            setState(() {
-                              _permisosRequeridosCheckboxes[key] = newValue!;
-                            });
-                          },
-                        ),
-                        Text(key),
-                      ],
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 20),
+                  ),
+                ],
+              ),
+              TextFormField( // Este campo se mantiene igual, es de solo lectura
+                controller: _tiempoEstimadoController,
+                readOnly: true,
+                decoration: const InputDecoration(labelText: 'Tiempo estimado de intervención (HH:MM)'),
+                onSaved: (newValue) => _tiempoEstimado = newValue!, // Se guarda el valor calculado
+              ),
+              const SizedBox(height: 20),
 
                 // --- Descripción Breve de Actividades Realizadas ---
                 const Text('Descripción Breve de las Actividades Realizadas',
@@ -989,15 +897,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                 ),
                 const SizedBox(height: 10),
                 _buildAttachedImages(), // <-- Muestra las fotos adjuntas
-                const SizedBox(height: 20),
-
-                ElevatedButton.icon(
-                  onPressed: _pickVideo,
-                  icon: const Icon(Icons.video_collection),
-                  label: const Text('Cargar Video Corto (Opcional)'),
-                ),
-                const SizedBox(height: 10),
-                _buildAttachedVideo(), // <-- Muestra el video adjunto
                 const SizedBox(height: 20),
 
                 // --- Evaluación Técnica ---
@@ -1052,35 +951,17 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                         : null,
                   ),
 
-                TextFormField(
-                  decoration: const InputDecoration(
-                    labelText: 'Riesgos observados (si aplica):',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                  onSaved: (newValue) => _riesgosObservados = newValue!,
-                ),
-                const SizedBox(height: 20),
-
                 // --- Recomendaciones ---
                 const Text('Recomendaciones',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const Divider(),
                 TextFormField(
                   decoration: const InputDecoration(
-                    labelText: 'Acciones sugeridas a corto plazo:',
+                    labelText: 'Acciones sugeridas:',
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 3,
-                  onSaved: (newValue) => _accionesSugeridasCortoPlazo = newValue!,
-                ),
-                TextFormField(
-                  decoration: const InputDecoration(
-                    labelText: 'Sugerencias para mejora o rediseño:',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                  onSaved: (newValue) => _sugerenciasMejoraRedisenio = newValue!,
+                  onSaved: (newValue) => _accionesSugeridas = newValue!,
                 ),
                 const SizedBox(height: 20),
 
@@ -1125,20 +1006,15 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                                 descripcionProblema: _descripcionProblema,
                                 accionesRealizadas: _accionesRealizadasCheckboxes.entries.where((entry) => entry.value).map((entry) => entry.key).toList(),
                                 otroAccionTexto: _otroAccionTexto,
-                                materialesRepuestos: _materialesRepuestos,
                                 horaInicio: _horaInicio,
                                 horaFin: _horaFin,
                                 tiempoEstimado: _tiempoEstimado,
-                                permisosRequeridos: _permisosRequeridosCheckboxes.entries.where((entry) => entry.value).map((entry) => entry.key).toList(),
                                 descripcionActividades: _descripcionActividades,
                                 fotosBytes: _fotosBytes, // ¡Aquí pasamos los bytes!
-                                videoBytes: _videoBytes, // ¡Aquí pasamos los bytes!
                                 condicionFinalEquipo: _condicionFinalEquipo,
                                 requiereSeguimiento: _requiereSeguimiento,
                                 detalleSeguimiento: _detalleSeguimiento,
-                                riesgosObservados: _riesgosObservados,
-                                accionesSugeridasCortoPlazo: _accionesSugeridasCortoPlazo,
-                                sugerenciasMejoraRedisenio: _sugerenciasMejoraRedisenio,
+                                accionesSugeridas: _accionesSugeridas,
                               );
 
 
@@ -1210,20 +1086,15 @@ extension MantenimientoRegistroCopyWith on MantenimientoRegistro {
     String? descripcionProblema,
     List<String>? accionesRealizadas,
     String? otroAccionTexto,
-    String? materialesRepuestos,
     String? horaInicio,
     String? horaFin,
     String? tiempoEstimado,
-    List<String>? permisosRequeridos,
     String? descripcionActividades,
     List<Uint8List>? fotosBytes,
-    Uint8List? videoBytes,
     String? condicionFinalEquipo,
     String? requiereSeguimiento,
     String? detalleSeguimiento,
-    String? riesgosObservados,
-    String? accionesSugeridasCortoPlazo,
-    String? sugerenciasMejoraRedisenio,
+    String? accionesSugeridas,
   }) {
     return MantenimientoRegistro(
       tituloReporte: tituloReporte ?? this.tituloReporte,
@@ -1242,20 +1113,16 @@ extension MantenimientoRegistroCopyWith on MantenimientoRegistro {
       descripcionProblema: descripcionProblema ?? this.descripcionProblema,
       accionesRealizadas: accionesRealizadas ?? this.accionesRealizadas,
       otroAccionTexto: otroAccionTexto ?? this.otroAccionTexto,
-      materialesRepuestos: materialesRepuestos ?? this.materialesRepuestos,
       horaInicio: horaInicio ?? this.horaInicio,
       horaFin: horaFin ?? this.horaFin,
       tiempoEstimado: tiempoEstimado ?? this.tiempoEstimado,
       permisosRequeridos: permisosRequeridos ?? this.permisosRequeridos,
       descripcionActividades: descripcionActividades ?? this.descripcionActividades,
       fotosBytes: fotosBytes ?? this.fotosBytes,
-      videoBytes: videoBytes ?? this.videoBytes,
       condicionFinalEquipo: condicionFinalEquipo ?? this.condicionFinalEquipo,
       requiereSeguimiento: requiereSeguimiento ?? this.requiereSeguimiento,
       detalleSeguimiento: detalleSeguimiento ?? this.detalleSeguimiento,
-      riesgosObservados: riesgosObservados ?? this.riesgosObservados,
-      accionesSugeridasCortoPlazo: accionesSugeridasCortoPlazo ?? this.accionesSugeridasCortoPlazo,
-      sugerenciasMejoraRedisenio: sugerenciasMejoraRedisenio ?? this.sugerenciasMejoraRedisenio,
+      accionesSugeridas: accionesSugeridas ?? this.accionesSugeridas,
     );
   }
 }

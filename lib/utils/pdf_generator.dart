@@ -105,12 +105,10 @@ class PdfGenerator {
           _buildInfoRow('Acciones:', registro.accionesRealizadas.join(', ')),
           if (registro.otroAccionTexto != null && registro.otroAccionTexto!.isNotEmpty)
             _buildInfoRow('Otra Acción:', registro.otroAccionTexto!),
-          _buildInfoRow('Materiales/Repuestos:', registro.materialesRepuestos),
           _buildInfoRow('Hora Inicio:', registro.horaInicio),
           _buildInfoRow('Hora Fin:', registro.horaFin),
           if (registro.tiempoEstimado != null && registro.tiempoEstimado!.isNotEmpty)
             _buildInfoRow('Tiempo Estimado:', registro.tiempoEstimado!),
-          _buildInfoRow('Permisos Requeridos:', registro.permisosRequeridos.join(', ')),
           _buildInfoRow('Descripción Actividades:', registro.descripcionActividades),
           pw.SizedBox(height: 10),
 
@@ -134,18 +132,6 @@ class PdfGenerator {
           }).toList(),
           pw.SizedBox(height: 10),
 
-          // --- Evidencia de Video (Ahora condicional) ---
-          if (registro.videoBytes != null)
-            pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text('Videos', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 5),
-                pw.Text('Video adjunto (no reproducible directamente en PDF).', style: const pw.TextStyle(fontSize: 12, fontStyle: pw.FontStyle.italic)),
-                pw.SizedBox(height: 10),
-              ],
-            ),
-
           // --- Evaluación Técnica ---
           pw.Text('Evaluación Técnica', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 5),
@@ -153,17 +139,13 @@ class PdfGenerator {
           _buildInfoRow('¿Requiere Seguimiento?:', registro.requiereSeguimiento),
           if (registro.detalleSeguimiento != null && registro.detalleSeguimiento!.isNotEmpty)
             _buildInfoRow('Detalle Seguimiento:', registro.detalleSeguimiento!),
-          if (registro.riesgosObservados != null && registro.riesgosObservados!.isNotEmpty)
-            _buildInfoRow('Riesgos Observados:', registro.riesgosObservados!),
           pw.SizedBox(height: 10),
 
           // --- Recomendaciones ---
           pw.Text('Recomendaciones', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 5),
-          if (registro.accionesSugeridasCortoPlazo != null && registro.accionesSugeridasCortoPlazo!.isNotEmpty)
-            _buildInfoRow('Acciones Sugeridas (Corto Plazo):', registro.accionesSugeridasCortoPlazo!),
-          if (registro.sugerenciasMejoraRedisenio != null && registro.sugerenciasMejoraRedisenio!.isNotEmpty)
-            _buildInfoRow('Sugerencias Mejora/Rediseño:', registro.sugerenciasMejoraRedisenio!),
+          if (registro.accionesSugeridas != null && registro.accionesSugeridas!.isNotEmpty)
+            _buildInfoRow('Acciones Sugeridas:', registro.accionesSugeridas!),
         ],
       ),
     );
