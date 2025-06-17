@@ -33,7 +33,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   final List<String> _minutos = ['00', '30'];
 
   // Instancia del modelo para guardar los datos
-  // <-- CAMBIO: Inicializa una instancia de tu modelo para ir guardando los datos.
   late MantenimientoRegistro _mantenimientoRegistro;
 
   // Variables de estado para los campos del formulario
@@ -84,20 +83,20 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   String _descripcionActividades = '';
 
   // 7. Evidencia (rutas de los archivos seleccionados)
-  // <-- CAMBIO: Almacenaremos los bytes, no solo las rutas String
+  // CAMBIO: Ahora son acumulativas
   List<Uint8List> _fotosBytes = [];
-  
-  // <-- NUEVO: Variables para mostrar las rutas/URLs en la UI
+
+  // NUEVO: Variables para mostrar las rutas/URLs en la UI
   List<String> _fotosDisplayPaths = [];
-  
+
   // 8. Evaluación Técnica
   String _condicionFinalEquipo = '';
   String _requiereSeguimiento = 'No';
   String _detalleSeguimiento = '';
-  
+
   // 9. Recomendaciones
   String _accionesSugeridas = '';
-  
+
   // Listas de opciones estáticas (para Spinners/Dropdowns)
   final List<String> _plantas = [
     'Energía & Planta de Fuerza', 'Pulpapel', 'Molino 1', 'Molino 3',
@@ -169,20 +168,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     _areaSeleccionada = _mantenimientoRegistro.area;
     _condicionEncontrada = _mantenimientoRegistro.condicionEncontrada;
     _condicionFinalEquipo = _mantenimientoRegistro.condicionFinalEquipo;
-
-    // Inicializar _fotosBytes y _videoBytes si el formulario está siendo editado
-    // (Aunque en este caso, el constructor de MantenimientoFormScreen no recibe un MantenimientoRegistro,
-    // esta lógica sería útil si lo hiciera en el futuro)
-    // _fotosBytes = _mantenimientoRegistro.fotosBytes;
-    // _videoBytes = _mantenimientoRegistro.videoBytes;
-
-    // Reconstruir display paths si ya hay bytes (para recargar un formulario existente)
-    // if (_fotosBytes.isNotEmpty) {
-    //   _fotosDisplayPaths = _fotosBytes.map((bytes) => 'Bytes de Imagen').toList(); // No es una ruta real
-    // }
-    // if (_videoBytes != null) {
-    //   _videoDisplayPath = 'Bytes de Video'; // No es una ruta real
-    // }
   }
 
   // Función para cargar el mapa de ubicaciones y descripciones desde assets/descripcion.txt
@@ -240,8 +225,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   }
 
   void _calcularTiempoEstimado() {
-    // Asegurarse de que ambos valores de hora de inicio y fin hayan sido seleccionados.
-    // Si no lo están, el tiempo estimado se limpia.
     if (_horaInicio.isNotEmpty && _horaFin.isNotEmpty) {
       try {
         final List<String> inicioParts = _horaInicio.split(':');
@@ -252,14 +235,10 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
         final int finHora = int.parse(finParts[0]);
         final int finMinuto = int.parse(finParts[1]);
 
-        // CAMBIO IMPORTANTE AQUÍ: Usamos una fecha ficticia para el cálculo
-        // Esto evita problemas si el cálculo se hace en un cambio de día real
         final DateTime dummyDate = DateTime(2000, 1, 1);
         final DateTime startTime = DateTime(dummyDate.year, dummyDate.month, dummyDate.day, inicioHora, inicioMinuto);
         DateTime endTime = DateTime(dummyDate.year, dummyDate.month, dummyDate.day, finHora, finMinuto);
 
-        // Si la hora de fin es anterior a la de inicio (ej. inicia a las 23:00 y termina a las 01:00),
-        // asumimos que termina al día siguiente para el cálculo de la duración.
         if (endTime.isBefore(startTime)) {
           endTime = endTime.add(const Duration(days: 1));
         }
@@ -270,18 +249,16 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
 
         setState(() {
           _tiempoEstimado = '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
-          _tiempoEstimadoController.text = _tiempoEstimado; // Actualiza el controlador del TextFormField
+          _tiempoEstimadoController.text = _tiempoEstimado;
         });
       } catch (e) {
-        // En caso de algún error inesperado en el cálculo (poco probable con Dropdowns).
         setState(() {
-          _tiempoEstimado = ''; // Limpiar si hay error
-          _tiempoEstimadoController.text = 'Error en el cálculo'; // Mensaje de error
+          _tiempoEstimado = '';
+          _tiempoEstimadoController.text = 'Error en el cálculo';
         });
-        print('Error al calcular tiempo: $e'); // Para depuración
+        print('Error al calcular tiempo: $e');
       }
     } else {
-      // Si alguna de las horas no ha sido seleccionada, limpiamos el campo de tiempo estimado.
       setState(() {
         _tiempoEstimado = '';
         _tiempoEstimadoController.text = '';
@@ -293,7 +270,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
 
-      // Recopilar datos de checkboxes (sin cambios aquí, ya están en el modelo)
       final List<String> selectedTipoMantenimiento = _tipoMantenimientoCheckboxes.entries
           .where((entry) => entry.value)
           .map((entry) => entry.key)
@@ -309,7 +285,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
           .map((entry) => entry.key)
           .toList();
 
-      // <-- CAMBIO: Actualizar la instancia del modelo con los datos recolectados
+      // CAMBIO: Actualizar la instancia del modelo con los datos recolectados
       _mantenimientoRegistro = _mantenimientoRegistro.copyWith(
         planta: _plantaSeleccionada,
         fecha: _fecha,
@@ -330,19 +306,15 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
         horaFin: _horaFin,
         tiempoEstimado: _tiempoEstimado,
         descripcionActividades: _descripcionActividades,
-        // <-- ¡Estas líneas son CRUCIALES para pasar los bytes al modelo!
-        fotosBytes: _fotosBytes,
-        // FIN CAMBIOS CLAVE
+        fotosBytes: _fotosBytes, // ¡Aquí pasamos los bytes que ahora son acumulativos!
         condicionFinalEquipo: _condicionFinalEquipo,
         requiereSeguimiento: _requiereSeguimiento,
         detalleSeguimiento: _detalleSeguimiento,
         accionesSugeridas: _accionesSugeridas,
       );
 
-      // Imprimir todos los datos recogidos (para depuración)
       print('Datos del Reporte: ${_mantenimientoRegistro.toJson()}');
 
-      // Mostrar SnackBar de éxito
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Formulario validado y datos recogidos (revisar consola)!')),
@@ -351,42 +323,43 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     }
   }
 
-  // <-- CAMBIO MAYOR: Lógica para seleccionar MÚLTIPLES imágenes (ahora lee bytes)
+  // CAMBIO MAYOR: Lógica para seleccionar MÚLTIPLES imágenes (ahora las AÑADE)
   Future<void> _pickImages() async {
     final ImagePicker picker = ImagePicker();
     try {
       final List<XFile> images = await picker.pickMultiImage();
 
       if (images.isNotEmpty) {
-        List<Uint8List> tempFotosBytes = [];
-        List<String> tempFotosDisplayPaths = [];
+        List<Uint8List> newFotosBytes = [];
+        List<String> newFotosDisplayPaths = [];
 
         for (XFile image in images) {
-          Uint8List bytes = await image.readAsBytes(); // ¡LEE LOS BYTES AQUÍ!
-          tempFotosBytes.add(bytes);
+          Uint8List bytes = await image.readAsBytes();
+          newFotosBytes.add(bytes);
 
-          // Para la visualización en la UI:
           if (kIsWeb) {
-            tempFotosDisplayPaths.add(image.path); // En web, image.path es la URL blob
+            newFotosDisplayPaths.add(image.path);
           } else {
-            tempFotosDisplayPaths.add(image.name); // En móvil/desktop, usa el nombre del archivo
+            newFotosDisplayPaths.add(image.name);
           }
         }
 
         setState(() {
-          _fotosBytes = tempFotosBytes;
-          _fotosDisplayPaths = tempFotosDisplayPaths;
+          // *** ESTA ES LA LÍNEA CLAVE QUE CAMBIA ***
+          // Añade las nuevas fotos a las existentes en lugar de reemplazarlas
+          _fotosBytes.addAll(newFotosBytes);
+          _fotosDisplayPaths.addAll(newFotosDisplayPaths);
         });
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Imágenes seleccionadas: ${_fotosBytes.length}')),
+            SnackBar(content: Text('Imágenes agregadas: ${newFotosBytes.length}. Total: ${_fotosBytes.length}')),
           );
         }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No se seleccionaron imágenes.')),
+            const SnackBar(content: Text('No se seleccionaron nuevas imágenes.')),
           );
         }
       }
@@ -400,7 +373,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     }
   }
 
-  // <-- NUEVO: Helper para mostrar las imágenes en la UI
+  // NUEVO: Helper para mostrar las imágenes en la UI con opción de eliminar
   Widget _buildAttachedImages() {
     if (_fotosBytes.isEmpty) {
       return const Text('No hay fotos adjuntas.');
@@ -417,11 +390,41 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
             final Uint8List bytes = entry.value;
             final String displayPath = _fotosDisplayPaths.length > index ? _fotosDisplayPaths[index].split('/').last : 'Imagen ${index + 1}';
 
-            return Column(
+            return Stack(
               children: [
-                // Usamos Image.memory porque funciona con Uint8List en todas las plataformas
-                Image.memory(bytes, width: 100, height: 100, fit: BoxFit.cover),
-                Text(displayPath, style: const TextStyle(fontSize: 10)),
+                Column(
+                  children: [
+                    Image.memory(bytes, width: 100, height: 100, fit: BoxFit.cover),
+                    Text(displayPath, style: const TextStyle(fontSize: 10)),
+                  ],
+                ),
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _fotosBytes.removeAt(index);
+                        _fotosDisplayPaths.removeAt(index);
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Imagen $displayPath eliminada.')),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 15,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             );
           }).toList(),
@@ -443,7 +446,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 // --- Imagen de Encabezado ---
-                // <-- CAMBIO: Asegúrate que esta ruta es correcta
                 Image.asset(
                   'assets/images/encabezado_taric.png', // <-- ¡RUTA AJUSTADA!
                   height: 100,
@@ -530,7 +532,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                     });
                   },
                 ),
-
                 // Campo Orden
                 TextFormField(
                   decoration: const InputDecoration(labelText: 'Orden'),
@@ -799,74 +800,74 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                 ),
                 const SizedBox(height: 20),
 
-               // --- Duración de la Intervención ---
-              const Text('Duración de la Intervención',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const Divider(),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>( // CAMBIO: Ahora es un Dropdown
-                      value: _horaInicio.isEmpty ? null : _horaInicio,
-                      decoration: const InputDecoration(
-                        labelText: 'Hora de inicio',
-                        hintText: 'Seleccione la hora', // Texto guía para el usuario
+                // --- Duración de la Intervención ---
+                const Text('Duración de la Intervención',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const Divider(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>( // CAMBIO: Ahora es un Dropdown
+                        value: _horaInicio.isEmpty ? null : _horaInicio,
+                        decoration: const InputDecoration(
+                          labelText: 'Hora de inicio',
+                          hintText: 'Seleccione la hora', // Texto guía para el usuario
+                        ),
+                        // Genera todas las combinaciones de horas y minutos (ej. "00:00", "00:30", "01:00", etc.)
+                        items: _horas.expand((h) => _minutos.map((m) => '$h:$m'))
+                            .map<DropdownMenuItem<String>>((String value) {
+                          return DropdownMenuItem<String>(
+                            value: value,
+                            child: Text(value),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _horaInicio = newValue!;
+                            _calcularTiempoEstimado(); // Recalcula el tiempo al cambiar
+                          });
+                        },
+                        validator: (value) => value == null || value.isEmpty
+                            ? 'Seleccione hora de inicio'
+                            : null,
                       ),
-                      // Genera todas las combinaciones de horas y minutos (ej. "00:00", "00:30", "01:00", etc.)
-                      items: _horas.expand((h) => _minutos.map((m) => '$h:$m'))
-                          .map<DropdownMenuItem<String>>((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          _horaInicio = newValue!;
-                          _calcularTiempoEstimado(); // Recalcula el tiempo al cambiar
-                        });
-                      },
-                      validator: (value) => value == null || value.isEmpty
-                          ? 'Seleccione hora de inicio'
-                          : null,
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: DropdownButtonFormField<String>( // CAMBIO: Ahora es un Dropdown
-                      value: _horaFin.isEmpty ? null : _horaFin,
-                      decoration: const InputDecoration(
-                        labelText: 'Hora de fin',
-                        hintText: 'Seleccione la hora', // Texto guía para el usuario
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DropdownButtonFormField<String>( // CAMBIO: Ahora es un Dropdown
+                        value: _horaFin.isEmpty ? null : _horaFin,
+                        decoration: const InputDecoration(
+                          labelText: 'Hora de fin',
+                          hintText: 'Seleccione la hora', // Texto guía para el usuario
+                        ),
+                        // Genera todas las combinaciones de horas y minutos
+                        items: _horas.expand((h) => _minutos.map((m) => '$h:$m'))
+                            .map<DropdownMenuItem<String>>((String value) {
+                          return DropdownMenuItem<String>(
+                            value: value,
+                            child: Text(value),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _horaFin = newValue!;
+                            _calcularTiempoEstimado(); // Recalcula el tiempo al cambiar
+                          });
+                        },
+                        validator: (value) => value == null || value.isEmpty
+                            ? 'Seleccione hora de fin'
+                            : null,
                       ),
-                      // Genera todas las combinaciones de horas y minutos
-                      items: _horas.expand((h) => _minutos.map((m) => '$h:$m'))
-                          .map<DropdownMenuItem<String>>((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          _horaFin = newValue!;
-                          _calcularTiempoEstimado(); // Recalcula el tiempo al cambiar
-                        });
-                      },
-                      validator: (value) => value == null || value.isEmpty
-                          ? 'Seleccione hora de fin'
-                          : null,
                     ),
-                  ),
-                ],
-              ),
-              TextFormField( // Este campo se mantiene igual, es de solo lectura
-                controller: _tiempoEstimadoController,
-                readOnly: true,
-                decoration: const InputDecoration(labelText: 'Tiempo estimado de intervención (HH:MM)'),
-                onSaved: (newValue) => _tiempoEstimado = newValue!, // Se guarda el valor calculado
-              ),
-              const SizedBox(height: 20),
+                  ],
+                ),
+                TextFormField( // Este campo se mantiene igual, es de solo lectura
+                  controller: _tiempoEstimadoController,
+                  readOnly: true,
+                  decoration: const InputDecoration(labelText: 'Tiempo estimado de intervención (HH:MM)'),
+                  onSaved: (newValue) => _tiempoEstimado = newValue!, // Se guarda el valor calculado
+                ),
+                const SizedBox(height: 20),
 
                 // --- Descripción Breve de Actividades Realizadas ---
                 const Text('Descripción Breve de las Actividades Realizadas',
@@ -986,36 +987,36 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                             // Asegurarse de que el modelo _mantenimientoRegistro tenga todos los datos
                             // (Ya se actualiza en _submitForm, pero si este botón se presiona antes,
                             // o si quieres que sea independiente del "Guardar", se puede llamar _submitForm aquí)
-                            
+
                             // Re-crear el objeto MantenimientoRegistro con los datos actuales del estado
                             // Esto es redundante si _submitForm ya se ha llamado, pero seguro.
-                             final currentRegistro = MantenimientoRegistro(
-                                tituloReporte: 'Reporte de Mantenimiento E-PWP',
-                                planta: _plantaSeleccionada,
-                                fecha: _fecha,
-                                realizadoPor: _realizadoPorSeleccionado,
-                                ayudante: _ayudanteSeleccionado,
-                                orden: _orden,
-                                area: _areaSeleccionada,
-                                ubicacionTecnica: _ubicacionTecnicaSeleccionada,
-                                descripcionUbicacion: _descripcionUbicacion,
-                                tipoMantenimiento: _tipoMantenimientoCheckboxes.entries.where((entry) => entry.value).map((entry) => entry.key).toList(),
-                                condicionEncontrada: _condicionEncontrada,
-                                estadoEquipo: _estadoEquipoCheckboxes.entries.where((entry) => entry.value).map((entry) => entry.key).toList(),
-                                existeAveria: _existeAveria,
-                                descripcionProblema: _descripcionProblema,
-                                accionesRealizadas: _accionesRealizadasCheckboxes.entries.where((entry) => entry.value).map((entry) => entry.key).toList(),
-                                otroAccionTexto: _otroAccionTexto,
-                                horaInicio: _horaInicio,
-                                horaFin: _horaFin,
-                                tiempoEstimado: _tiempoEstimado,
-                                descripcionActividades: _descripcionActividades,
-                                fotosBytes: _fotosBytes, // ¡Aquí pasamos los bytes!
-                                condicionFinalEquipo: _condicionFinalEquipo,
-                                requiereSeguimiento: _requiereSeguimiento,
-                                detalleSeguimiento: _detalleSeguimiento,
-                                accionesSugeridas: _accionesSugeridas,
-                              );
+                            final currentRegistro = MantenimientoRegistro(
+                              tituloReporte: 'Reporte de Mantenimiento E-PWP',
+                              planta: _plantaSeleccionada,
+                              fecha: _fecha,
+                              realizadoPor: _realizadoPorSeleccionado,
+                              ayudante: _ayudanteSeleccionado,
+                              orden: _orden,
+                              area: _areaSeleccionada,
+                              ubicacionTecnica: _ubicacionTecnicaSeleccionada,
+                              descripcionUbicacion: _descripcionUbicacion,
+                              tipoMantenimiento: _tipoMantenimientoCheckboxes.entries.where((entry) => entry.value).map((entry) => entry.key).toList(),
+                              condicionEncontrada: _condicionEncontrada,
+                              estadoEquipo: _estadoEquipoCheckboxes.entries.where((entry) => entry.value).map((entry) => entry.key).toList(),
+                              existeAveria: _existeAveria,
+                              descripcionProblema: _descripcionProblema,
+                              accionesRealizadas: _accionesRealizadasCheckboxes.entries.where((entry) => entry.value).map((entry) => entry.key).toList(),
+                              otroAccionTexto: _otroAccionTexto,
+                              horaInicio: _horaInicio,
+                              horaFin: _horaFin,
+                              tiempoEstimado: _tiempoEstimado,
+                              descripcionActividades: _descripcionActividades,
+                              fotosBytes: _fotosBytes, // ¡Aquí pasamos los bytes acumulados!
+                              condicionFinalEquipo: _condicionFinalEquipo,
+                              requiereSeguimiento: _requiereSeguimiento,
+                              detalleSeguimiento: _detalleSeguimiento,
+                              accionesSugeridas: _accionesSugeridas,
+                            );
 
 
                             try {
@@ -1064,66 +1065,5 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   }
 }
 
-// *** IMPORTANTE: Asegúrate de que esta extensión está en tu archivo `mantenimiento_registro.dart` ***
-// No la pongas aquí en `mantenimiento_form_screen.dart`
-// Pégala DENTRO de `lib/models/mantenimiento_registro.dart`
-/*
-extension MantenimientoRegistroCopyWith on MantenimientoRegistro {
-  MantenimientoRegistro copyWith({
-    String? tituloReporte,
-    String? planta,
-    String? fecha,
-    String? realizadoPor,
-    String? ayudante,
-    String? orden,
-    String? area,
-    String? ubicacionTecnica,
-    String? descripcionUbicacion,
-    List<String>? tipoMantenimiento,
-    String? condicionEncontrada,
-    List<String>? estadoEquipo,
-    String? existeAveria,
-    String? descripcionProblema,
-    List<String>? accionesRealizadas,
-    String? otroAccionTexto,
-    String? horaInicio,
-    String? horaFin,
-    String? tiempoEstimado,
-    String? descripcionActividades,
-    List<Uint8List>? fotosBytes,
-    String? condicionFinalEquipo,
-    String? requiereSeguimiento,
-    String? detalleSeguimiento,
-    String? accionesSugeridas,
-  }) {
-    return MantenimientoRegistro(
-      tituloReporte: tituloReporte ?? this.tituloReporte,
-      planta: planta ?? this.planta,
-      fecha: fecha ?? this.fecha,
-      realizadoPor: realizadoPor ?? this.realizadoPor,
-      ayudante: ayudante ?? this.ayudante,
-      orden: orden ?? this.orden,
-      area: area ?? this.area,
-      ubicacionTecnica: ubicacionTecnica ?? this.ubicacionTecnica,
-      descripcionUbicacion: descripcionUbicacion ?? this.descripcionUbicacion,
-      tipoMantenimiento: tipoMantenimiento ?? this.tipoMantenimiento,
-      condicionEncontrada: condicionEncontrada ?? this.condicionEncontrada,
-      estadoEquipo: estadoEquipo ?? this.estadoEquipo,
-      existeAveria: existeAveria ?? this.existeAveria,
-      descripcionProblema: descripcionProblema ?? this.descripcionProblema,
-      accionesRealizadas: accionesRealizadas ?? this.accionesRealizadas,
-      otroAccionTexto: otroAccionTexto ?? this.otroAccionTexto,
-      horaInicio: horaInicio ?? this.horaInicio,
-      horaFin: horaFin ?? this.horaFin,
-      tiempoEstimado: tiempoEstimado ?? this.tiempoEstimado,
-      permisosRequeridos: permisosRequeridos ?? this.permisosRequeridos,
-      descripcionActividades: descripcionActividades ?? this.descripcionActividades,
-      fotosBytes: fotosBytes ?? this.fotosBytes,
-      condicionFinalEquipo: condicionFinalEquipo ?? this.condicionFinalEquipo,
-      requiereSeguimiento: requiereSeguimiento ?? this.requiereSeguimiento,
-      detalleSeguimiento: detalleSeguimiento ?? this.detalleSeguimiento,
-      accionesSugeridas: accionesSugeridas ?? this.accionesSugeridas,
-    );
-  }
-}
-*/
+// Asegúrate de que la extensión MantenimientoRegistroCopyWith esté en tu archivo `lib/models/mantenimiento_registro.dart`
+// NO la pongas aquí, ya que ya estaba en el lugar correcto según tus comentarios.
