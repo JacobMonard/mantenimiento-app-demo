@@ -31,6 +31,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'App de Mantenimiento',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue, // Puedes personalizar tu tema aquí
         visualDensity: VisualDensity.adaptivePlatformDensity,

@@ -2,18 +2,18 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // Para formateo de fechas
-import 'package:flutter/services.dart' show rootBundle; // Importar para leer assets
+import 'package:flutter/services.dart' show rootBundle, SystemChannels; // Importar para leer assets y SystemChannels
 import 'package:image_picker/image_picker.dart'; // Importación para seleccionar imágenes/videos
-import 'dart:typed_data'; // <-- CAMBIO: Importar para Uint8List
-import 'dart:io'; // <-- CAMBIO: Importar para File. Útil para mostrar imágenes en móvil/desktop.
-import 'package:flutter/foundation.dart' show kIsWeb; // <-- CAMBIO: Para saber si estamos en web
+import 'dart:typed_data'; // Importar para Uint8List
+import 'dart:io'; // Importar para File. Útil para mostrar imágenes en móvil/desktop.
+import 'package:flutter/foundation.dart' show kIsWeb; // Para saber si estamos en web
 
 // ¡Nuevas importaciones para PDF y compartir!
-import 'package:printing/printing.dart'; // <-- NUEVO: Para previsualizar/imprimir PDF
-import 'package:pdf/pdf.dart'; // <-- NUEVO: Para PdfPageFormat
-import '../utils/pdf_generator.dart'; // <-- NUEVO: Importa tu generador de PDF
-import 'package:path_provider/path_provider.dart'; // <-- NUEVO: Para guardar archivos en el dispositivo
-import 'package:share_plus/share_plus.dart'; // <-- NUEVO: Para compartir archivos
+import 'package:printing/printing.dart'; // Para previsualizar/imprimir PDF
+import 'package:pdf/pdf.dart'; // Para PdfPageFormat
+import '../utils/pdf_generator.dart'; // Importa tu generador de PDF
+import 'package:path_provider/path_provider.dart'; // Para guardar archivos en el dispositivo
+import 'package:share_plus/share_plus.dart'; // CORRECCIÓN: Ruta de importación para share_plus
 
 import '../models/mantenimiento_registro.dart'; // Importa tu modelo de datos
 
@@ -39,8 +39,34 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   // 2. Datos Generales
   String _plantaSeleccionada = '';
   String _fecha = '';
-  String _realizadoPorSeleccionado = '';
-  String _ayudanteSeleccionado = 'Ninguno';
+
+  // CAMBIOS AQUI: REALIZADO POR Y AYUDANTE (CON OPCION 'OTRO')
+  // Listas de opciones estáticas (para Spinners/Dropdowns)
+  final List<String> _plantas = [
+    'Energía & Planta de Fuerza', 'Pulpapel', 'Molino 1', 'Molino 3',
+    'Molino 4', 'Molino 6', 'FEC', 'Recuperación',
+  ];
+
+  // Listas actualizadas para incluir 'Otro'
+  final List<String> _realizadoPorOpciones = [
+    'Robinson Montoya', 'Carlos Salcedo', 'Samir Ramirez',
+    'William Garzon', 'Daniel Franco', 'Camilo Ayala',
+    'Francisco Dagua', 'Alvaro Molina', 'Erick V. Leon', 'Juan C. Reina', 'Otro', // <--- AÑADIDO 'Otro'
+  ];
+  String? _selectedRealizadoPor; // Usar String? para manejar el estado inicial null
+  bool _showOtherRealizadoPorField = false; // Controla la visibilidad del campo "Otro"
+  final TextEditingController _otherRealizadoPorController = TextEditingController(); // Controlador para el campo "Otro"
+
+  final List<String> _ayudantesOpciones = [
+    'Ninguno', 'Robinson Montoya', 'Carlos Salcedo', 'Samir Ramirez',
+    'William Garzon', 'Daniel Franco', 'Camilo Ayala',
+    'Francisco Dagua', 'Alvaro Molina', 'Erick V. Leon', 'Juan C. Reina', 'Otro', // <--- AÑADIDO 'Otro'
+  ];
+  String? _selectedAyudante; // Usar String? para manejar el estado inicial null
+  bool _showOtherAyudanteField = false; // Controla la visibilidad del campo "Otro"
+  final TextEditingController _otherAyudanteController = TextEditingController(); // Controlador para el campo "Otro"
+  // FIN CAMBIOS
+
   String _orden = '';
 
   // 3. Información del Equipo
@@ -83,10 +109,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   String _descripcionActividades = '';
 
   // 7. Evidencia (rutas de los archivos seleccionados)
-  // CAMBIO: Ahora son acumulativas
   List<Uint8List> _fotosBytes = [];
-
-  // NUEVO: Variables para mostrar las rutas/URLs en la UI
   List<String> _fotosDisplayPaths = [];
 
   // 8. Evaluación Técnica
@@ -97,21 +120,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   // 9. Recomendaciones
   String _accionesSugeridas = '';
 
-  // Listas de opciones estáticas (para Spinners/Dropdowns)
-  final List<String> _plantas = [
-    'Energía & Planta de Fuerza', 'Pulpapel', 'Molino 1', 'Molino 3',
-    'Molino 4', 'Molino 6', 'FEC', 'Recuperación',
-  ];
-  final List<String> _realizadoPor = [
-    'Robinson Montoya', 'Carlos Salcedo', 'Samir Ramirez',
-    'William Garzon', 'Daniel Franco', 'Camilo Ayala',
-    'Francisco Dagua', 'Alvaro Molina', 'Erick V. Leon', 'Juan C. Reina',
-  ];
-  final List<String> _ayudantes = [
-    'Ninguno', 'Robinson Montoya', 'Carlos Salcedo', 'Samir Ramirez',
-    'William Garzon', 'Daniel Franco', 'Camilo Ayala',
-    'Francisco Dagua', 'Alvaro Molina', 'Erick V. Leon', 'Juan C. Reina',
-  ];
+  // Listas de opciones estáticas restantes
   final List<String> _areas = [
     'Caldera 5', 'Caldera 4', 'Caldera 3', 'TGAS', 'TG3',
     'Sistema de carbón', 'Aire comprimido', 'Transporte de ceniza', 'Agua',
@@ -138,8 +147,8 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
       tituloReporte: 'Reporte de Mantenimiento E-PWP',
       planta: _plantas.isNotEmpty ? _plantas.first : '',
       fecha: _fecha,
-      realizadoPor: _realizadoPor.isNotEmpty ? _realizadoPor.first : '',
-      ayudante: _ayudantes.isNotEmpty ? _ayudantes.first : 'Ninguno',
+      realizadoPor: _realizadoPorOpciones.isNotEmpty ? _realizadoPorOpciones.first : '', // Usar _realizadoPorOpciones
+      ayudante: _ayudantesOpciones.isNotEmpty ? _ayudantesOpciones.first : 'Ninguno', // Usar _ayudantesOpciones
       orden: '',
       area: _areas.isNotEmpty ? _areas.first : '',
       ubicacionTecnica: '', // Se llena después de cargar el txt
@@ -150,6 +159,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
       existeAveria: 'No',
       descripcionProblema: '',
       accionesRealizadas: [],
+      otroAccionTexto: '', // Asegúrate de inicializar
       horaInicio: '',
       horaFin: '',
       tiempoEstimado: '',
@@ -163,11 +173,21 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
 
     // Actualizar los valores iniciales de los dropdowns si _mantenimientoRegistro ya tiene datos
     _plantaSeleccionada = _mantenimientoRegistro.planta;
-    _realizadoPorSeleccionado = _mantenimientoRegistro.realizadoPor;
-    _ayudanteSeleccionado = _mantenimientoRegistro.ayudante ?? 'Ninguno';
+    _selectedRealizadoPor = _mantenimientoRegistro.realizadoPor; // Usar _selectedRealizadoPor
+    _selectedAyudante = _mantenimientoRegistro.ayudante ?? 'Ninguno'; // Usar _selectedAyudante
     _areaSeleccionada = _mantenimientoRegistro.area;
     _condicionEncontrada = _mantenimientoRegistro.condicionEncontrada;
     _condicionFinalEquipo = _mantenimientoRegistro.condicionFinalEquipo;
+  }
+
+  @override
+  void dispose() {
+    _dateController.dispose();
+    _descripcionUbicacionController.dispose();
+    _tiempoEstimadoController.dispose();
+    _otherRealizadoPorController.dispose(); // Dispose del nuevo controlador
+    _otherAyudanteController.dispose(); // Dispose del nuevo controlador
+    super.dispose();
   }
 
   // Función para cargar el mapa de ubicaciones y descripciones desde assets/descripcion.txt
@@ -285,12 +305,24 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
           .map((entry) => entry.key)
           .toList();
 
-      // CAMBIO: Actualizar la instancia del modelo con los datos recolectados
+      // OBTENER LOS VALORES FINALES PARA _realizadoPorSeleccionado y _ayudanteSeleccionado
+      String finalRealizadoPor = _selectedRealizadoPor ?? '';
+      if (_selectedRealizadoPor == 'Otro') {
+        finalRealizadoPor = _otherRealizadoPorController.text.trim();
+      }
+
+      String finalAyudante = _selectedAyudante ?? '';
+      if (_selectedAyudante == 'Otro') {
+        finalAyudante = _otherAyudanteController.text.trim();
+      }
+      // FIN OBTENCIÓN DE VALORES FINALES
+
+      // Actualizar la instancia del modelo con los datos recolectados
       _mantenimientoRegistro = _mantenimientoRegistro.copyWith(
         planta: _plantaSeleccionada,
         fecha: _fecha,
-        realizadoPor: _realizadoPorSeleccionado,
-        ayudante: _ayudanteSeleccionado,
+        realizadoPor: finalRealizadoPor, // Usar el valor final
+        ayudante: finalAyudante, // Usar el valor final
         orden: _orden,
         area: _areaSeleccionada,
         ubicacionTecnica: _ubicacionTecnicaSeleccionada,
@@ -306,7 +338,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
         horaFin: _horaFin,
         tiempoEstimado: _tiempoEstimado,
         descripcionActividades: _descripcionActividades,
-        fotosBytes: _fotosBytes, // ¡Aquí pasamos los bytes que ahora son acumulativos!
+        fotosBytes: _fotosBytes,
         condicionFinalEquipo: _condicionFinalEquipo,
         requiereSeguimiento: _requiereSeguimiento,
         detalleSeguimiento: _detalleSeguimiento,
@@ -323,7 +355,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     }
   }
 
-  // CAMBIO MAYOR: Lógica para seleccionar MÚLTIPLES imágenes (ahora las AÑADE)
   Future<void> _pickImages() async {
     final ImagePicker picker = ImagePicker();
     try {
@@ -345,8 +376,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
         }
 
         setState(() {
-          // *** ESTA ES LA LÍNEA CLAVE QUE CAMBIA ***
-          // Añade las nuevas fotos a las existentes en lugar de reemplazarlas
           _fotosBytes.addAll(newFotosBytes);
           _fotosDisplayPaths.addAll(newFotosDisplayPaths);
         });
@@ -373,7 +402,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
     }
   }
 
-  // NUEVO: Helper para mostrar las imágenes en la UI con opción de eliminar
   Widget _buildAttachedImages() {
     if (_fotosBytes.isEmpty) {
       return const Text('No hay fotos adjuntas.');
@@ -447,7 +475,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
               children: <Widget>[
                 // --- Imagen de Encabezado ---
                 Image.asset(
-                  'assets/images/encabezado_taric.png', // <-- ¡RUTA AJUSTADA!
+                  'assets/images/encabezado_taric.png',
                   height: 100,
                   width: double.infinity,
                   fit: BoxFit.contain,
@@ -460,7 +488,6 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // ... (El resto de tus campos de formulario, NO CAMBIAN en esta sección)
                 // --- 2. Datos Generales ---
                 const Text('Datos Generales',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
@@ -496,11 +523,11 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                       : null,
                 ),
 
-                // Campo Realizado por
+                // CAMBIOS AQUI: Campo Realizado por
                 DropdownButtonFormField<String>(
-                  value: _realizadoPorSeleccionado.isEmpty ? null : _realizadoPorSeleccionado,
+                  value: _selectedRealizadoPor, // Usar la nueva variable
                   decoration: const InputDecoration(labelText: 'Realizado por'),
-                  items: _realizadoPor.map<DropdownMenuItem<String>>((String value) {
+                  items: _realizadoPorOpciones.map<DropdownMenuItem<String>>((String value) { // Usar la nueva lista
                     return DropdownMenuItem<String>(
                       value: value,
                       child: Text(value),
@@ -508,19 +535,50 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                   }).toList(),
                   onChanged: (String? newValue) {
                     setState(() {
-                      _realizadoPorSeleccionado = newValue!;
+                      _selectedRealizadoPor = newValue; // Actualizar la nueva variable
+                      _showOtherRealizadoPorField = (newValue == 'Otro'); // Controlar visibilidad del campo "Otro"
+                      if (!_showOtherRealizadoPorField) {
+                        _otherRealizadoPorController.clear(); // Limpiar el campo si ya no es 'Otro'
+                      }
                     });
                   },
-                  validator: (value) => value == null || value.isEmpty
-                      ? 'Seleccione el personal responsable'
-                      : null,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Seleccione el personal responsable';
+                    }
+                    if (value == 'Otro' && _otherRealizadoPorController.text.trim().isEmpty) {
+                      return 'Por favor, especifique el nombre del técnico';
+                    }
+                    return null;
+                  },
                 ),
+                // Campo de texto 'Otro' para 'Realizado por'
+                Visibility(
+                  visible: _showOtherRealizadoPorField,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: TextFormField(
+                      controller: _otherRealizadoPorController,
+                      decoration: const InputDecoration(
+                        labelText: 'Especificar otro técnico',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (_showOtherRealizadoPorField && (value == null || value.trim().isEmpty)) {
+                          return 'Este campo no puede estar vacío';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16.0), // Ajustar el espacio
 
-                // Campo Ayudante (Opcional)
+                // CAMBIOS AQUI: Campo Ayudante (Opcional)
                 DropdownButtonFormField<String>(
-                  value: _ayudanteSeleccionado.isEmpty ? null : _ayudanteSeleccionado,
+                  value: _selectedAyudante, // Usar la nueva variable
                   decoration: const InputDecoration(labelText: 'Ayudante (Opcional)'),
-                  items: _ayudantes.map<DropdownMenuItem<String>>((String value) {
+                  items: _ayudantesOpciones.map<DropdownMenuItem<String>>((String value) { // Usar la nueva lista
                     return DropdownMenuItem<String>(
                       value: value,
                       child: Text(value),
@@ -528,10 +586,44 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                   }).toList(),
                   onChanged: (String? newValue) {
                     setState(() {
-                      _ayudanteSeleccionado = newValue!;
+                      _selectedAyudante = newValue; // Actualizar la nueva variable
+                      _showOtherAyudanteField = (newValue == 'Otro'); // Controlar visibilidad del campo "Otro"
+                      if (!_showOtherAyudanteField) {
+                        _otherAyudanteController.clear(); // Limpiar el campo si ya no es 'Otro'
+                      }
                     });
                   },
+                  validator: (value) {
+                    // Si seleccionó 'Otro' en un campo opcional, valida que el campo de texto no esté vacío.
+                    if (value == 'Otro' && _otherAyudanteController.text.trim().isEmpty) {
+                      return 'Por favor, especifica el nombre del ayudante';
+                    }
+                    return null;
+                  },
                 ),
+                // Campo de texto 'Otro' para 'Ayudante (Opcional)'
+                Visibility(
+                  visible: _showOtherAyudanteField,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: TextFormField(
+                      controller: _otherAyudanteController,
+                      decoration: const InputDecoration(
+                        labelText: 'Especificar otro ayudante',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (_showOtherAyudanteField && (value == null || value.trim().isEmpty)) {
+                          return 'Este campo no puede estar vacío';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16.0), // Ajustar el espacio
+                // FIN CAMBIOS
+
                 // Campo Orden
                 TextFormField(
                   decoration: const InputDecoration(labelText: 'Orden'),
@@ -807,7 +899,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: DropdownButtonFormField<String>( // CAMBIO: Ahora es un Dropdown
+                      child: DropdownButtonFormField<String>( // Ahora es un Dropdown
                         value: _horaInicio.isEmpty ? null : _horaInicio,
                         decoration: const InputDecoration(
                           labelText: 'Hora de inicio',
@@ -834,7 +926,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: DropdownButtonFormField<String>( // CAMBIO: Ahora es un Dropdown
+                      child: DropdownButtonFormField<String>( // Ahora es un Dropdown
                         value: _horaFin.isEmpty ? null : _horaFin,
                         decoration: const InputDecoration(
                           labelText: 'Hora de fin',
@@ -897,7 +989,7 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                   label: const Text('Adjuntar Fotos (Antes/Durante/Después)'),
                 ),
                 const SizedBox(height: 10),
-                _buildAttachedImages(), // <-- Muestra las fotos adjuntas
+                _buildAttachedImages(), // Muestra las fotos adjuntas
                 const SizedBox(height: 20),
 
                 // --- Evaluación Técnica ---
@@ -977,25 +1069,36 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                           child: Text('Guardar Reporte', style: TextStyle(fontSize: 18)),
                         ),
                       ),
-                      const SizedBox(height: 20), // Espacio entre botones
+                      const SizedBox(height: 20),
 
-                      // <-- NUEVO: Botón para Generar Reporte PDF
+                      // Botón para Generar Reporte PDF
                       ElevatedButton.icon(
                         onPressed: () async {
+                          // Cerrar el teclado antes de generar el PDF para evitar problemas de renderizado
+                          FocusScope.of(context).unfocus(); // Alternativa para ocultar el teclado
+
                           if (_formKey.currentState!.validate()) {
                             _formKey.currentState!.save();
-                            // Asegurarse de que el modelo _mantenimientoRegistro tenga todos los datos
-                            // (Ya se actualiza en _submitForm, pero si este botón se presiona antes,
-                            // o si quieres que sea independiente del "Guardar", se puede llamar _submitForm aquí)
 
-                            // Re-crear el objeto MantenimientoRegistro con los datos actuales del estado
-                            // Esto es redundante si _submitForm ya se ha llamado, pero seguro.
+                            // OBTENER LOS VALORES FINALES PARA _realizadoPorSeleccionado y _ayudanteSeleccionado
+                            // Esto es importante para el PDF si el formulario no se "guardó" previamente
+                            String finalRealizadoPor = _selectedRealizadoPor ?? '';
+                            if (_selectedRealizadoPor == 'Otro') {
+                              finalRealizadoPor = _otherRealizadoPorController.text.trim();
+                            }
+
+                            String finalAyudante = _selectedAyudante ?? '';
+                            if (_selectedAyudante == 'Otro') {
+                              finalAyudante = _otherAyudanteController.text.trim();
+                            }
+                            // FIN OBTENCIÓN DE VALORES FINALES
+
                             final currentRegistro = MantenimientoRegistro(
                               tituloReporte: 'Reporte de Mantenimiento E-PWP',
                               planta: _plantaSeleccionada,
                               fecha: _fecha,
-                              realizadoPor: _realizadoPorSeleccionado,
-                              ayudante: _ayudanteSeleccionado,
+                              realizadoPor: finalRealizadoPor, // Usar el valor final
+                              ayudante: finalAyudante, // Usar el valor final
                               orden: _orden,
                               area: _areaSeleccionada,
                               ubicacionTecnica: _ubicacionTecnicaSeleccionada,
@@ -1011,27 +1114,23 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
                               horaFin: _horaFin,
                               tiempoEstimado: _tiempoEstimado,
                               descripcionActividades: _descripcionActividades,
-                              fotosBytes: _fotosBytes, // ¡Aquí pasamos los bytes acumulados!
+                              fotosBytes: _fotosBytes,
                               condicionFinalEquipo: _condicionFinalEquipo,
                               requiereSeguimiento: _requiereSeguimiento,
                               detalleSeguimiento: _detalleSeguimiento,
                               accionesSugeridas: _accionesSugeridas,
                             );
 
-
                             try {
-                              final pdfBytes = await PdfGenerator.generateMantenimientoPdf(currentRegistro); // <-- Pasa el modelo completo
+                              final pdfBytes = await PdfGenerator.generateMantenimientoPdf(currentRegistro);
 
                               if (kIsWeb) {
-                                // Para web, usa printing para abrir en una nueva pestaña o descargar
                                 await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdfBytes);
                               } else {
-                                // Para móvil/desktop, guarda el archivo y luego compártelo
-                                final directory = await getApplicationDocumentsDirectory(); // O getTemporaryDirectory()
+                                final directory = await getApplicationDocumentsDirectory();
                                 final file = File('${directory.path}/reporte_mantenimiento_${DateTime.now().millisecondsSinceEpoch}.pdf');
                                 await file.writeAsBytes(pdfBytes);
 
-                                // Compartir el archivo
                                 await Share.shareXFiles([XFile(file.path)], subject: 'Reporte de Mantenimiento');
 
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1063,7 +1162,49 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
       ),
     );
   }
-}
 
-// Asegúrate de que la extensión MantenimientoRegistroCopyWith esté en tu archivo `lib/models/mantenimiento_registro.dart`
-// NO la pongas aquí, ya que ya estaba en el lugar correcto según tus comentarios.
+  // --- Widgets auxiliares (sin cambios significativos, solo para mantener la estructura) ---
+  Widget _buildSectionTitle(BuildContext context, String title) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 24.0),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).primaryColor,
+          ),
+        ),
+        const Divider(thickness: 2, height: 10),
+        const SizedBox(height: 16.0),
+      ],
+    );
+  }
+
+  Widget _buildFechaField() {
+    return TextFormField(
+      readOnly: true,
+      controller: _dateController, // Usar _dateController que ya tienes para la fecha
+      decoration: InputDecoration(
+        labelText: 'Fecha',
+        border: const OutlineInputBorder(),
+        suffixIcon: IconButton(
+          icon: const Icon(Icons.calendar_today),
+          onPressed: () => _selectDate(context), // Llamar a tu _selectDate existente
+        ),
+      ),
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Campo requerido';
+        }
+        return null;
+      },
+    );
+  }
+
+  // Nota: No tienes un _buildHoraField() separado en tu código original,
+  // la hora se maneja directamente en los Dropdowns de hora de inicio/fin.
+  // Mantengo los auxiliares que ya tenías o son comunes.
+}
