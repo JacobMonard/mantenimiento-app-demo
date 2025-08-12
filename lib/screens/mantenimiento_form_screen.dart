@@ -43,24 +43,20 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
   // CAMBIOS AQUI: REALIZADO POR Y AYUDANTE (CON OPCION 'OTRO')
   // Listas de opciones estáticas (para Spinners/Dropdowns)
   final List<String> _plantas = [
-    'Energía & Planta de Fuerza', 'Pulpapel', 'Molino 1', 'Molino 3',
-    'Molino 4', 'Molino 6', 'FEC', 'Recuperación',
+    'Innovación & Centro de Datos', 'Logística', 'Línea 1', 'Línea 2',
+    'Línea 3', 'Línea 4', 'Control de Calidad', 'Infraestructura',
   ];
 
   // Listas actualizadas para incluir 'Otro'
   final List<String> _realizadoPorOpciones = [
-    'Robinson Montoya', 'Carlos Salcedo', 'Samir Ramirez',
-    'William Garzon', 'Daniel Franco', 'Camilo Ayala',
-    'Francisco Dagua', 'Alvaro Molina', 'Erick V. Leon', 'Juan C. Reina', 'Otro', // <--- AÑADIDO 'Otro'
+    'Robinson Montoya', 'Ana López', 'Carlos Pérez', 'Otro', // <--- AÑADIDO 'Otro'
   ];
   String? _selectedRealizadoPor; // Usar String? para manejar el estado inicial null
   bool _showOtherRealizadoPorField = false; // Controla la visibilidad del campo "Otro"
   final TextEditingController _otherRealizadoPorController = TextEditingController(); // Controlador para el campo "Otro"
 
   final List<String> _ayudantesOpciones = [
-    'Ninguno', 'Robinson Montoya', 'Carlos Salcedo', 'Samir Ramirez',
-    'William Garzon', 'Daniel Franco', 'Camilo Ayala',
-    'Francisco Dagua', 'Alvaro Molina', 'Erick V. Leon', 'Juan C. Reina', 'Otro', // <--- AÑADIDO 'Otro'
+    'Ninguno', 'Fernando Diaz', 'Laura Gómez', 'Otro', // <--- AÑADIDO 'Otro'
   ];
   String? _selectedAyudante; // Usar String? para manejar el estado inicial null
   bool _showOtherAyudanteField = false; // Controla la visibilidad del campo "Otro"
@@ -122,8 +118,9 @@ class _MantenimientoFormScreenState extends State<MantenimientoFormScreen> {
 
   // Listas de opciones estáticas restantes
   final List<String> _areas = [
-    'Caldera 5', 'Caldera 4', 'Caldera 3', 'TGAS', 'TG3',
-    'Sistema de carbón', 'Aire comprimido', 'Transporte de ceniza', 'Agua',
+    'Generador Auxiliar', 'Subestación Eléctrica', 'Torre de Enfriamiento', 'Planta de Tratamiento',
+    'Sistema de Climatización', 'Control de Proceso', 'Área de Almacenamiento', 'Reciclaje de Agua',
+    'Suministro de Vapor',
   ];
   List<String> _ubicacionesTecnicasOpciones = [];
   Map<String, String> _ubicacionDescripcionMap = {};
